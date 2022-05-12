@@ -5,7 +5,7 @@ import nibabel as nib
 import numpy as np
 import sys
 import time
-from Data.data_visualization import testfunc
+from DataProcessing.data_visualization import testfunc
 
 def load():
 
