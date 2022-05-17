@@ -1,19 +1,54 @@
-# Lets rock this thesis!
+# Call training and testing. In both cases use /Results for the results.
+import torch
+import pytorch_lightning as pl
+from pytorch_lightning import seed_everything
+from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 
-import os
-import nibabel as nib
-import numpy as np
-import sys
-import time
-from DataProcessing.data_visualization import testfunc
+from LearningModule import LearningModule
+from Dataloader import DataModule
+import config
+import postprocessing
 
-def load():
 
-    print(sys.argv[1])
-    print(sys.argv[2])
-    print(sys.argv[3])
-    #time.sleep(120)
-    testfunc()
+def main():
+
+    # Reset
+    torch.cuda.empty_cache()
+    seed_everything(42)
+
+    # Test
+    if config.mode == "test":
+        path = postprocessing.prepare_results()
+        model = LearningModule.load_from_checkpoint(path)
+        dataloader = DataModule()
+        trainer = pl.Trainer()
+        trainer.test(model, test_dataloaders=dataloader.test_dataloader())
+        postprocessing.processing()
+        quit()
+
+    # Load
+    model = LearningModule()
+    dataloader = DataModule()
+
+    # Log and Call
+    logger = CSVLogger(save_dir=config.log_dir_logger,
+                                  name=config.network)
+    callbacks = ModelCheckpoint(save_top_k=1,
+                                dirpath=config.log_dir,
+                                monitor="val_loss",
+                                filename=config.file_name,
+                                save_last=True)
+
+    # Train
+    trainer = pl.Trainer(gpus=1,
+                         max_epochs=config.epochs,
+                         deterministic=True,
+                         logger=logger,
+                         callbacks=[callbacks],
+                         log_every_n_steps=10)
+
+    trainer.fit(model, datamodule=dataloader)
 
 if __name__ == "__main__":
-    load()
+    main()

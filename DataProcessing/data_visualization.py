@@ -7,6 +7,7 @@ import os
 from glob import glob
 from skimage.util import montage
 import shutil
+from os.path import join as opj
 
 
 def preview_images():
@@ -163,11 +164,74 @@ def tumor_diffspace_control():
         plt.close(fig)
 
 
-#mask_control()
+def final_data_test():
 
-def testfunc():
-    print("yes!")
+    data_folder = sorted(glob('/work/scratch/ecke/Masterarbeit/Data/Test/vp*'))
+    mask_folder = sorted(glob('/work/scratch/ecke/Masterarbeit/Data/Test/mask*'))
+    dir = "final_data_test"
+    if os.path.exists(dir):
+        shutil.rmtree(dir)
+    os.mkdir(dir)
 
+    for i in range(len(data_folder)):
+
+        test_image = np.load(data_folder[i])
+        test_mask = np.load(mask_folder[i])
+        example_id = data_folder[i].split("/")[-1]
+
+        test_image = np.swapaxes(test_image, 1, 3)
+        test_mask = np.swapaxes(test_mask, 0, 2)
+
+        """
+        if example_id == "vp8.npy":
+            test_image = np.swapaxes(test_image, 1, 3)
+            test_mask = np.swapaxes(test_mask, 0, 2)
+            np.save(opj("/work/scratch/ecke/Masterarbeit/Data/Test", example_id), test_image)
+            np.save(opj("/work/scratch/ecke/Masterarbeit/Data/Test", "mask" + example_id), test_mask)
+            
+        print(example_id)
+        print(test_image.shape)
+        print(test_mask.shape)    
+        """
+
+        # print image
+        fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
+        # Use first bvec-image (random, can be other)
+        ax1.imshow(montage(test_image[0, ...]), cmap='gray')
+        # do not pint background values == 0
+        test_mask = test_mask.astype(float)
+        test_mask[test_mask == 0] = np.nan
+        ax1.imshow(montage(test_mask), vmin=0, vmax=4, alpha=1)
+        path = os.path.join(dir, example_id.replace(".npy","") + '_overlay.png')
+        fig.savefig(path)
+        plt.close(fig)
+
+
+def final_data_train():
+
+    data_folder = sorted(glob('/work/scratch/ecke/Masterarbeit/Data/Train/vp*'))
+    dir = "final_data_train"
+    if os.path.exists(dir):
+        shutil.rmtree(dir)
+    os.mkdir(dir)
+
+    for i in range(len(data_folder)):
+
+        test_image = np.load(data_folder[i])
+        example_id = data_folder[i].split("/")[-1]
+
+        test_image = np.swapaxes(test_image, 1, 3)
+
+        # print image
+        fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
+        # Use first bvec-image (random, can be other)
+        ax1.imshow(montage(test_image[0, ...]), cmap='gray')
+        path = os.path.join(dir, example_id.replace(".npy","") + '_overlay.png')
+        fig.savefig(path)
+        plt.close(fig)
+
+final_data_test()
+#final_data_train()
 #tumor_diffspace_control()
 
 """
