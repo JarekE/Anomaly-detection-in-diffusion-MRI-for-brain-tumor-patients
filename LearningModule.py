@@ -8,6 +8,9 @@ from torch import optim
 import matplotlib.pyplot as plt
 import numpy as np
 from os.path import join as opj
+from Models.UNet import UNet3d
+
+import config
 
 
 class LearningModule(LightningModule):
@@ -15,8 +18,16 @@ class LearningModule(LightningModule):
     def __init__(self):
         super(LearningModule, self).__init__()
 
-        self.model = VanillaVAE(in_channels=64, latent_dim=config.latent_dim)
-        self.params = config.vanilla_params
+        # Choose from available networks
+        if config.network == "VanillaVAE":
+            self.model = VanillaVAE(in_channels=64, latent_dim=config.latent_dim)
+            self.params = config.vanilla_params
+        if config.network == "UNet":
+            self.model = UNet3d(in_channels=64)
+            self.params = config.unet_params
+        else:
+            raise ValueError('You chose a network that is not available atm.')
+
 
     def forward(self, z):
         y = self.model(z)
@@ -29,33 +40,25 @@ class LearningModule(LightningModule):
 
         results = self.forward(input)
 
-        # Since input = label it works. Otherwise one should give label to function.
+        results.append(target)
+
         train_loss = self.model.loss_function(*results,
-                                              M_N=self.params['kld_weight'],  # al_img.shape[0]/ self.num_train_imgs,
-                                              optimizer_idx=optimizer_idx,
-                                              batch_idx=batch_idx)
+                                              M_N=self.params['kld_weight'])
 
         self.log_dict({key: val.item() for key, val in train_loss.items()}, sync_dist=True)
 
         return train_loss['loss']
 
     def validation_step(self, batch, batch_idx, optimizer_idx = 0):
-        labels = batch['target']
-        real_img = batch['input']
+        target = batch['target']
+        input = batch['input']
 
-        results = self.forward(real_img)
+        results = self.forward(input)
 
-        if 0:
-            plt.figure()
-            plt.imshow(results[0][0, 0, ...][:, 40 , :].cpu().numpy(), cmap='gray')
-            plt.show()
-            plt.close()
+        results.append(target)
 
-        # Since input = label it works. Otherwise one should give label to function.
         val_loss = self.model.loss_function(*results,
-                                            M_N=1.0,  # real_img.shape[0]/ self.num_val_imgs,
-                                            optimizer_idx=optimizer_idx,
-                                            batch_idx=batch_idx)
+                                            M_N=1.0)
 
         self.log_dict({f"val_{key}": val.item() for key, val in val_loss.items()}, sync_dist=True)
 
@@ -63,7 +66,7 @@ class LearningModule(LightningModule):
         pass
 
     def test_step(self, batch, batch_idx):
-        labels = batch['target']
+        #labels = batch['target']
         real_img = batch['input']
         id_list = batch['id']
 
@@ -73,23 +76,17 @@ class LearningModule(LightningModule):
             name = id.split("/")[-1]
 
             output = results[0][index, ...]
-            mu = results[2][index, ...]
-            logvar = results[3][index, ...]
-
             output_path = opj(config.results_path, 'output_')
-            mu_path = opj(config.results_path, 'mu_')
-            logvar_path = opj(config.results_path, 'logvar_')
+            np.save(output_path + name, output.cpu().detach().numpy())
 
-            np.save(output_path+name, output.cpu().detach().numpy())
-            np.save(mu_path+name, mu.cpu().detach().numpy())
-            np.save(logvar_path+name, logvar.cpu().detach().numpy())
+            if config.network == "VanillaVAE":
+                mu = results[2][index, ...]
+                logvar = results[3][index, ...]
+                mu_path = opj(config.results_path, 'mu_')
+                logvar_path = opj(config.results_path, 'logvar_')
+                np.save(mu_path+name, mu.cpu().detach().numpy())
+                np.save(logvar_path+name, logvar.cpu().detach().numpy())
 
-        """
-        plt.figure()
-        plt.imshow(results[0][0, 0, ...][:, :, 32].cpu().numpy(), cmap='gray')
-        plt.show()
-        plt.close()
-        """
 
     def on_test_epoch_end(self):
         pass

@@ -179,8 +179,10 @@ def final_data_test():
         test_mask = np.load(mask_folder[i])
         example_id = data_folder[i].split("/")[-1]
 
-        test_image = np.swapaxes(test_image, 1, 3)
-        test_mask = np.swapaxes(test_mask, 0, 2)
+        #test_image = np.swapaxes(test_image, 1, 3)
+        #test_mask = np.swapaxes(test_mask, 0, 2)
+        test_image = np.flip(np.flip(np.swapaxes(test_image, 1, 3), axis=1), axis=2)
+        test_mask = np.flip(np.flip(np.swapaxes(test_mask, 0, 2), axis=0), axis=1)
 
         """
         if example_id == "vp8.npy":
@@ -220,7 +222,8 @@ def final_data_train():
         test_image = np.load(data_folder[i])
         example_id = data_folder[i].split("/")[-1]
 
-        test_image = np.swapaxes(test_image, 1, 3)
+        #test_image = np.swapaxes(test_image, 1, 3)
+        test_image = np.flip(np.flip(np.swapaxes(test_image, 1, 3), axis=1), axis=2)
 
         # print image
         fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
@@ -230,7 +233,7 @@ def final_data_train():
         fig.savefig(path)
         plt.close(fig)
 
-final_data_test()
+#final_data_test()
 #final_data_train()
 #tumor_diffspace_control()
 

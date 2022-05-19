@@ -79,7 +79,7 @@ def process_test():
 
         bvals, bvecs = read_bvals_bvecs(opj(dataset, "bvals"), opj(dataset, "bvecs"))
         bvals = np.around(bvals / 1000).astype(np.int) * 1000
-        print(bvals)
+        #print(bvals)
 
         # scale the b-values between 1 and 0 (Diffusionsabschwächung)
         meanb0 = np.expand_dims(np.mean(dwi[..., bvals < 150], axis=-1), axis=-1)
@@ -94,9 +94,8 @@ def process_test():
 
         # move axis
         dwi = np.moveaxis(dwi, 3, 0)
-        print(dwi.shape)
 
-        # crop to 64, 80, 56
+        # crop to 64, 80, 64
         ch, x, y, z = dwi.shape
         x1 = x // 2 - 32
         x2 = x // 2 + 32
@@ -105,13 +104,23 @@ def process_test():
 
         patch_dwi = dwi[:, x1:x2, y1:y2, :]
         patch_mask = mask[x1:x2, y1:y2, :]
-        patch_dwi = np.float32(np.concatenate((np.zeros((*patch_dwi.shape[:3], 5)), patch_dwi,
-                                               np.zeros((*patch_dwi.shape[:3], 5))), axis=-1))
-        patch_mask = np.float32(np.concatenate((np.zeros((*patch_mask.shape[:2], 5)), patch_mask,
-                                                np.zeros((*patch_mask.shape[:2], 5))), axis=-1))
+        patch_brainmask = brainmask[x1:x2, y1:y2, :]
+
+        if brainmask.shape[2] == 62:
+            sub = 4
+        else:
+            sub = 0
+        patch_dwi = np.float32(np.concatenate((np.zeros((*patch_dwi.shape[:3], (5-sub))), patch_dwi,
+                                               np.zeros((*patch_dwi.shape[:3], (5-sub)))), axis=-1))
+        patch_mask = np.float32(np.concatenate((np.zeros((*patch_mask.shape[:2], (5-sub))), patch_mask,
+                                                np.zeros((*patch_mask.shape[:2], (5-sub)))), axis=-1))
+        patch_brainmask = np.float32(np.concatenate((np.zeros((*patch_brainmask.shape[:2],(5-sub))), patch_brainmask,
+                                                np.zeros((*patch_brainmask.shape[:2], (5-sub)))), axis=-1))
 
         np.save(opj(test_path, example_id), patch_dwi)
         np.save(opj(test_path, "mask"+example_id), patch_mask)
+        #print(patch_brainmask.shape)
+        np.save(opj(test_path, "b0_brainmask" + example_id), patch_brainmask)
 
 
 def correction_uka_mask():
