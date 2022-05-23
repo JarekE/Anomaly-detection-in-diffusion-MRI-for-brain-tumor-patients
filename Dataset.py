@@ -6,9 +6,32 @@ from tqdm import tqdm
 import random
 from scipy.special import comb
 import matplotlib.pyplot as plt
+from LearningModule import LearningModule
 
 import config
 from config import uka_subjects
+
+
+def image_in_painting(x):
+    _, img_rows, img_cols, img_deps = x.shape
+    cnt = 2
+    while cnt > 0 and random.random() < 0.95:
+        # Shape the block
+        block_noise_size_x = random.randint(img_rows//12, img_rows//6)
+        block_noise_size_y = random.randint(img_cols//12, img_cols//6)
+        block_noise_size_z = random.randint(img_deps//12, img_deps//6)
+        # Place the block
+        noise_x = random.randint(6, img_rows-block_noise_size_x-6)
+        noise_y = random.randint(6, img_cols-block_noise_size_y-6)
+        noise_z = random.randint(6, img_deps-block_noise_size_z-6)
+        x[:,
+          noise_x:noise_x+block_noise_size_x,
+          noise_y:noise_y+block_noise_size_y,
+          noise_z:noise_z+block_noise_size_z] = np.random.rand(block_noise_size_x,
+                                                               block_noise_size_y,
+                                                               block_noise_size_z, ) * 1.0
+        cnt -= 1
+    return x
 
 def test_print(img, aug_img):
     plt.figure()
@@ -67,9 +90,10 @@ def nonlinear_transformation(x, prob=0.9):
 
 def data_augmentation(img):
     # Basic augmentation by applying a non linear transformation to the value of each voxel.
-    nonlinear = nonlinear_transformation(img, prob=1).astype(np.float32)
+    nonlinear = nonlinear_transformation(img, prob=0.5).astype(np.float32)
+    inpainting = image_in_painting(img)
     # Do not change axis. Output must be (64,64,80,64)
-    return nonlinear
+    return nonlinear, inpainting
 
 
 class UKADataset(Dataset):
@@ -82,18 +106,37 @@ class UKADataset(Dataset):
         print("\n Loading data...")
         for subject in tqdm(self.subject_ids):
 
-            patch = np.load(subject)
-            target = patch
-            self.patches.append((patch, target, subject))
+            if config.network == "VoxelVAE":
+                patch = np.load(subject)
+                #target = patch
 
-            if (type == "training") and (config.augmentation == True):
-                aug_patch = data_augmentation(patch)
-                self.patches.append((aug_patch, target, subject))
+                for idx, x in np.ndenumerate(patch[0, ...]):
+                    voxel_input = patch[:, idx[0], idx[1], idx[2]]
+                    voxel_target = patch[:, idx[0], idx[1], idx[2]]
+                    coordinates = idx
+                    self.patches.append((voxel_input, voxel_target, subject, coordinates))
+
+            else:
+                patch = np.load(subject)
+                target = patch
+                self.patches.append((patch, target, subject))
+
+                if (type != "test") and (config.augmentation == True):
+                    nonlinear_patch, inpainting_patch = data_augmentation(patch)
+                    self.patches.append((nonlinear_patch, target, subject))
+                    self.patches.append((inpainting_patch, target, subject))
 
     def __len__(self):
         return len(self.patches)
 
     def __getitem__(self, idx):
-        return {"input": self.patches[idx][0],
-                "target": self.patches[idx][1],
-                "id": self.patches[idx][2]}
+
+        if config.network == "VoxelVAE":
+            return {"input": self.patches[idx][0],
+                    "target": self.patches[idx][1],
+                    "id": self.patches[idx][2],
+                    "coordinates": self.patches[idx][3]}
+        else:
+            return {"input": self.patches[idx][0],
+                    "target": self.patches[idx][1],
+                    "id": self.patches[idx][2]}

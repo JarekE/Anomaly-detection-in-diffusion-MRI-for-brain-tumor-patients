@@ -16,6 +16,7 @@ def main():
     # Reset
     torch.cuda.empty_cache()
     seed_everything(42)
+    print(config.args)
 
     # Test
     if config.mode == "test":

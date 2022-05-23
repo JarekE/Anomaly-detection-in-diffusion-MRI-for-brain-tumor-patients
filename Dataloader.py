@@ -14,12 +14,12 @@ class DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         self.train_dataset = UKADataset(type="training")
         return DataLoader(self.train_dataset, batch_size=config.batch_size,
-                                     shuffle=False, num_workers=0)
+                                     shuffle=True, num_workers=0)
 
     def val_dataloader(self):
         self.val_dataset = UKADataset(type="validation")
         return DataLoader(self.val_dataset, batch_size=config.batch_size,
-                                         shuffle=False, num_workers=0)
+                                         shuffle=True, num_workers=0)
 
     def test_dataloader(self):
         self.test_dataset = UKADataset(type="test")
