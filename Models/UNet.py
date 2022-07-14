@@ -60,7 +60,8 @@ class UNet3d(nn.Module):
     def out_block(self, in_dim, out_dim):
         model = nn.Sequential(
             nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
-        )
+            nn.Sigmoid()
+            )
         return model
 
     def forward(self, x):

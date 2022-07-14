@@ -9,6 +9,8 @@ from LearningModule import LearningModule
 from Dataloader import DataModule
 import config
 import postprocessing
+import os
+import shutil
 
 
 def main():
@@ -20,10 +22,15 @@ def main():
 
     # Test
     if config.mode == "test":
+
+        if os.path.exists("logs/DataDropOff"):
+            shutil.rmtree("logs/DataDropOff")
+        os.mkdir("logs/DataDropOff")
+
         path = postprocessing.prepare_results()
         model = LearningModule.load_from_checkpoint(path)
         dataloader = DataModule()
-        trainer = pl.Trainer()
+        trainer = pl.Trainer(gpus=1)
         trainer.test(model, test_dataloaders=dataloader.test_dataloader())
         postprocessing.processing()
         quit()

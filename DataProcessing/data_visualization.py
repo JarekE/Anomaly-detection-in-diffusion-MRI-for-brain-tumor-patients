@@ -10,6 +10,10 @@ import shutil
 from os.path import join as opj
 
 
+def raw_output():
+    ...
+
+
 def preview_images():
 
     # Data
@@ -199,7 +203,7 @@ def final_data_test():
         # print image
         fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
         # Use first bvec-image (random, can be other)
-        ax1.imshow(montage(test_image[0, ...]), cmap='gray')
+        ax1.imshow(montage(test_image[0, :, :, :]), cmap='gray')
         # do not pint background values == 0
         test_mask = test_mask.astype(float)
         test_mask[test_mask == 0] = np.nan

@@ -106,14 +106,44 @@ class UKADataset(Dataset):
         print("\n Loading data...")
         for subject in tqdm(self.subject_ids):
 
-            if config.network == "VoxelVAE":
+            if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
                 patch = np.load(subject)
-                #target = patch
+                mask_id = subject.split("/")[-1]
+                if self.type == "test":
+                    b0_mask = np.load(config.img_path_uka+'/Test/b0_brainmask'+mask_id)
+                else:
+                    b0_mask = np.load(config.img_path_uka + '/Train/b0_brainmask_' + mask_id)
+
+                patch = np.pad(patch, [(0, 0), (1, 1), (1, 1), (1, 1)], mode='constant', constant_values=0)
+                b0_mask = np.pad(b0_mask, [(1, 1), (1, 1), (1, 1)], mode='constant', constant_values=0)
+
+                if 0:
+                    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
+                    ax[0].imshow(patch[0, :, :, 30], cmap='gray')
+                    ax[0].axis('off')
+                    ax[1].imshow(b0_mask[:, :, 30], cmap='gray')
+                    ax[1].axis('off')
+                    plt.tight_layout()
+                    plt.show()
+                    plt.close(fig)
 
                 for idx, x in np.ndenumerate(patch[0, ...]):
-                    voxel_input = patch[:, idx[0], idx[1], idx[2]]
-                    voxel_target = patch[:, idx[0], idx[1], idx[2]]
-                    coordinates = idx
+                    # Only use voxel from brain for training/validation/testing
+                    if b0_mask[idx[0], idx[1], idx[2]] == 0:
+                        continue
+
+                    if config.network == "CNNVoxelVAE":
+                        voxel_input = patch[:, (idx[0]-1):(idx[0]+2), (idx[1]-1):(idx[1]+2), (idx[2]-1):(idx[2]+2)]
+                        voxel_target = patch[:, (idx[0]-1):(idx[0]+2), (idx[1]-1):(idx[1]+2), (idx[2]-1):(idx[2]+2)]
+
+                        #if voxel_input.shape != (64,3,3,3):
+                        #    a = 1
+                    else:
+                        voxel_input = patch[:, idx[0], idx[1], idx[2]]
+                        voxel_target = patch[:, idx[0], idx[1], idx[2]]
+
+                    # Padding the arrays shifts the coordinates
+                    coordinates = (idx[0]-1, idx[1]-1, idx[2]-1)
                     self.patches.append((voxel_input, voxel_target, subject, coordinates))
 
             else:
@@ -131,7 +161,7 @@ class UKADataset(Dataset):
 
     def __getitem__(self, idx):
 
-        if config.network == "VoxelVAE":
+        if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
             return {"input": self.patches[idx][0],
                     "target": self.patches[idx][1],
                     "id": self.patches[idx][2],

@@ -47,13 +47,6 @@ class VanillaVAE(BaseVAE):
 
         self.encoder = nn.Sequential(*modules)
 
-        # Not mine
-        """
-        self.fc_mu = nn.Linear(hidden_dims[-1]*4*5*4, latent_dim)
-
-        self.fc_var = nn.Linear(hidden_dims[-1]*4*5*4, latent_dim)
-        """
-
         # 40960 -> 512 -> 256
         self.fc = nn.Linear(hidden_dims[-1] * 4 * 5 * 4, hidden_dims[-1])
         self.fc_mu = nn.Linear(hidden_dims[-1], latent_dim)
@@ -310,23 +303,19 @@ class VoxelVAE(BaseVAE):
                                      nn.ReLU(),
                                      nn.Linear(in_features=32, out_features=16),
                                      nn.ReLU(),
-                                     nn.Linear(in_features=16, out_features=8),
-                                     nn.ReLU(),
                                      )
 
         # decoder
-        self.decoder = nn.Sequential(nn.Linear(in_features=8, out_features=16),
-                                     nn.ReLU(),
-                                     nn.Linear(in_features=16, out_features=32),
+        self.decoder = nn.Sequential(nn.Linear(in_features=16, out_features=32),
                                      nn.ReLU(),
                                      nn.Linear(in_features=32, out_features=64),
                                      nn.Sigmoid(),
                                      )
 
-        self.fc_mu = nn.Linear(in_features=8, out_features=4)
-        self.fc_var = nn.Linear(in_features=8, out_features=4)
+        self.fc_mu = nn.Linear(in_features=16, out_features=8)
+        self.fc_var = nn.Linear(in_features=16, out_features=8)
 
-        self.decoder_input = nn.Linear(in_features=4, out_features=8)
+        self.decoder_input = nn.Linear(in_features=8, out_features=16)
 
 
     def encode(self, input: Tensor) -> List[Tensor]:
@@ -365,6 +354,96 @@ class VoxelVAE(BaseVAE):
         mu = args[2]
         log_var = args[3]
         target = args[4]
+
+        kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
+        recons_loss = F.mse_loss(recons, target)
+
+        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim = 1), dim = 0)
+
+        loss = recons_loss + kld_weight * kld_loss
+        return {'loss': loss, 'Reconstruction_Loss':recons_loss.detach(), 'KLD':-kld_loss.detach()}
+
+
+class CNNVoxelVAE(BaseVAE):
+
+    def __init__(self,
+                 in_channels: int,
+                 hidden_dims: List = None,
+                 **kwargs) -> None:
+        super(CNNVoxelVAE, self).__init__()
+
+        # encoder
+        self.conv_block = nn.Sequential(nn.Conv3d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1),
+                                        nn.BatchNorm3d(128),
+                                        nn.LeakyReLU())
+
+        self.encoder = nn.Sequential(nn.Linear(in_features=128*3*3*3, out_features=1000),
+                                     nn.ReLU(),
+                                     nn.Linear(in_features=1000, out_features=64),
+                                     nn.ReLU(),
+                                     nn.Linear(in_features=64, out_features=16),
+                                     nn.ReLU(),
+                                     nn.Linear(in_features=16, out_features=8),
+                                     nn.ReLU(),
+                                     )
+        # decoder
+        self.decoder = nn.Sequential(nn.Linear(in_features=8, out_features=16),
+                                     nn.ReLU(),
+                                     nn.Linear(in_features=16, out_features=64),
+                                     nn.ReLU(),
+                                     nn.Linear(in_features=64, out_features=1000),
+                                     nn.ReLU(),
+                                     nn.Linear(in_features=1000, out_features=64*1*1*1),
+                                     nn.Sigmoid()
+                                     )
+
+        self.fc_mu = nn.Linear(in_features=8, out_features=2)
+        self.fc_var = nn.Linear(in_features=8, out_features=2)
+
+        self.decoder_input = nn.Linear(in_features=2, out_features=8)
+
+
+    def encode(self, input: Tensor) -> List[Tensor]:
+
+        conv = self.conv_block(input)
+        flat = torch.flatten(conv, start_dim=1)
+        result = self.encoder(flat)
+
+        mu = self.fc_mu(result)
+        log_var = self.fc_var(result)
+
+        return [mu, log_var]
+
+    def decode(self, z: Tensor) -> Tensor:
+
+        result = self.decoder_input(z)
+        result = self.decoder(result)
+
+        return result
+
+    def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
+
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return eps * std + mu
+
+    def forward(self, input: Tensor, **kwargs) -> List[Tensor]:
+        mu, log_var = self.encode(input)
+        z = self.reparameterize(mu, log_var)
+        return  [self.decode(z), input, mu, log_var]
+
+    def loss_function(self,
+                      *args,
+                      **kwargs) -> dict:
+
+        recons = args[0]
+        #input = args[1]
+        mu = args[2]
+        log_var = args[3]
+        target = args[4]
+
+        # Only middle Voxel
+        target = target[:,:,1,1,1]
 
         kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
         recons_loss = F.mse_loss(recons, target)

@@ -1,7 +1,7 @@
 # Here I will define all my deep learning
 import torch
 from pytorch_lightning.core.lightning import LightningModule
-from Models.VAE import VanillaVAE, SpatialVAE, VoxelVAE
+from Models.VAE import VanillaVAE, SpatialVAE, VoxelVAE, CNNVoxelVAE
 import torch.nn as nn
 from torch import optim
 import matplotlib.pyplot as plt
@@ -9,6 +9,8 @@ import numpy as np
 from os.path import join as opj
 from Models.UNet import UNet3d
 import pickle
+import os
+import shutil
 
 import config
 
@@ -31,6 +33,9 @@ class LearningModule(LightningModule):
         elif config.network == "VoxelVAE":
             self.model = VoxelVAE(in_channels=64)
             self.params = config.voxelvae_params
+        elif config.network == "CNNVoxelVAE":
+            self.model = CNNVoxelVAE(in_channels=64)
+            self.params = config.cnnvoxelvae_params
         else:
             raise ValueError('You chose a network that is not available atm: '+config.network)
 
@@ -65,6 +70,7 @@ class LearningModule(LightningModule):
 
         val_loss = self.model.loss_function(*results,
                                             M_N=1.0)
+        print(val_loss.items())
 
         self.log_dict({f"val_{key}": val.item() for key, val in val_loss.items()}, sync_dist=True)
 
@@ -72,14 +78,13 @@ class LearningModule(LightningModule):
         #labels = batch['target']
         real_img = batch['input']
         id_list = batch['id']
-        coordinates_list = batch["coordinates"]
-
 
         results = self.forward(real_img)
 
-        if (config.network == "VoxelVAE"):
-            # Real Values, Result Values, ID of each value, Coordinates of each value, mu of each value, logvar of each value
-            save_list = [real_img, results[0], id_list, coordinates_list, results[2], results[3]]
+        if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
+            coordinates_list = batch["coordinates"]
+            # Result Values, ID of each value, Coordinates of each value, mu of each value, logvar of each value
+            save_list = [results[0], id_list, coordinates_list, results[2], results[3]]
 
             with open('logs/DataDropOff/batch_'+str(batch_idx), 'wb') as fp:
                 pickle.dump(save_list, fp)
@@ -116,7 +121,7 @@ class LearningModule(LightningModule):
         try:
             if self.params['scheduler_gamma'] is not None:
                 scheduler = optim.lr_scheduler.ExponentialLR(optims[0],
-                                                             gamma=self.params['scheduler_gamma'])
+                            gamma=self.params['scheduler_gamma'])
                 scheds.append(scheduler)
 
                 return optims, scheds

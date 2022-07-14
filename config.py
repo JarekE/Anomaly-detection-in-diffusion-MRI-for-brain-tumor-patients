@@ -9,9 +9,9 @@ from argparse import ArgumentParser
 # Arguments
 parser = ArgumentParser()
 parser.add_argument("-m", "--mode", default="train", help="Training mode of network (train or test)")
-parser.add_argument("-t", "--test_this_model", default="VoxelVAE-epoch=00-val_loss=0.26-max_epochs=10.ckpt", help="Name of model to be tested. Only usefull if mode is -test-.")
+parser.add_argument("-t", "--test_this_model", default="CNNVoxelVAE-epoch=97-val_loss=1.51-max_epochs=100.ckpt", help="Name of model to be tested. Only usefull if mode is -test-.")
 parser.add_argument("-e", "--epochs", default=200, type=int, help="Number of epochs to train the model.")
-parser.add_argument("-n", "--network", default="VoxelVAE", help="Name of Network: VanillaVAE, SpatialVAE, VoxelVAE or UNet.")
+parser.add_argument("-n", "--network", default="CNNVoxelVAE", help="Name of Network: VanillaVAE, SpatialVAE, VoxelVAE or UNet.")
 parser.add_argument("-a", "--augmentation", default=False, type=bool, help="Augment the data by nonlinear transformations and inpaintings. Currently not availabe for VoxelVAE.")
 args = vars(parser.parse_args())
 mode = args["mode"]
@@ -21,13 +21,15 @@ network = args["network"]
 augmentation = args["augmentation"]
 
 # For full images, we have only 28. 4 is a power of 2 and a divider of 28.
-if network == "VoxelVAE":
-  batch_size = (4*64*64)
+if (network == "VoxelVAE"):
+  batch_size = (48*64*64)
+elif (network == "CNNVoxelVAE"):
+  batch_size = (64 * 64)
 else:
   batch_size = 4
-latent_dim = 256
 
 # VanillaVAE params
+latent_dim = 256
 vanilla_params = {"LR": 0.0005,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95,
@@ -40,10 +42,16 @@ spatialvae_params = {"LR": 0.0005,
   "kld_weight": 0.002,      # (input.shape.flatten / latent space dimensions)^-1
   "manual_seed": 1265}
 
-voxelvae_params = {"LR": 0.0005,
+voxelvae_params = {"LR": 0.00001,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95,
   "kld_weight": 0.0625,      # (input.shape.flatten / latent space dimensions)^-1
+  "manual_seed": 1265}
+
+cnnvoxelvae_params = {"LR": 0.00001,
+  "weight_decay": 0.0,
+  "scheduler_gamma": 0.95,
+  "kld_weight": 0.0025,      # (input.shape.flatten / latent space dimensions)^-1
   "manual_seed": 1265}
 
 unet_params = {"LR": 0.0001,
@@ -55,14 +63,14 @@ unet_params = {"LR": 0.0001,
 # Load data. Training data is randomly shuffled.
 img_path_uka = '/work/scratch/ecke/Masterarbeit/Data'
 train = glob(opj(img_path_uka, "Train", "vp*"))
-random.shuffle(train)
 test = glob(opj(img_path_uka, "Test", "vp*"))
 test.sort()
 test_mask = glob(opj(img_path_uka, "Test", "mask*"))
 test_mask.sort()
 test_b0_brainmask = glob(opj(img_path_uka, "Test", "b0_brainmask*"))
 test_b0_brainmask.sort()
-uka_subjects = {"training": train[0:24], "validation": train[24:28], "test": test[0:32], "test_mask": test[0:32]}
+split = 24 #used in dataset
+uka_subjects = {"training": train[0:split], "validation": train[split:28], "test": test[0:32], "test_mask": test[0:32]}
 
 # Names and paths
 Tensor = TypeVar('torch.tensor')

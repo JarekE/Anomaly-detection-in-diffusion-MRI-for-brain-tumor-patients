@@ -60,8 +60,13 @@ def process_train():
         patch_dwi = dwi[:, x1:x2, y1:y2, :]
         patch_dwi = np.float32(np.concatenate((np.zeros((*patch_dwi.shape[:3], 5)), patch_dwi,
                                                np.zeros((*patch_dwi.shape[:3], 5))), axis=-1))
+        patch_brainmask = brainmask[x1:x2, y1:y2, :]
+        patch_brainmask = np.float32(np.concatenate((np.zeros((*patch_brainmask.shape[:2], 5)), patch_brainmask,
+                                               np.zeros((*patch_brainmask.shape[:2], 5))), axis=-1))
 
         np.save(opj(train_path, example_id), patch_dwi)
+        np.save(opj(train_path, 'b0_brainmask_'+example_id), patch_brainmask)
+
 
 # Tumor data + masks.
 def process_test():
