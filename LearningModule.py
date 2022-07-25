@@ -69,7 +69,7 @@ class LearningModule(LightningModule):
         results.append(target)
 
         val_loss = self.model.loss_function(*results,
-                                            M_N=1.0)
+                                            M_N=self.params['kld_weight'])
         print(val_loss.items())
 
         self.log_dict({f"val_{key}": val.item() for key, val in val_loss.items()}, sync_dist=True)

@@ -241,46 +241,18 @@ def final_data_train():
 #final_data_train()
 #tumor_diffspace_control()
 
-"""
-test = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp3_x.npy")
-test_meta = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp3_meta.npy")
 
-test2 = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp1_x.npy")
-test_meta2 = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp1_meta.npy")
+fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
 
-print("x")
+test = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/maskvp1.npy")
+test_brainmask = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/brainmask_withoutCSFvp1.npy")
 
-fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(10, 5))
-
-test = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp3_x.npy")
-test_meta = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp3_meta.npy")
-
-b = 90
-ax[0].imshow(test[0, b, :, :], cmap='gray')
+b = 35
+ax[0].imshow(test[:, :, b], cmap='gray')
 ax[0].axis('off')
-ax[1].imshow(test[1, b, :, :], cmap='gray')
+ax[1].imshow(test_brainmask[:, :, b], cmap='gray')
 ax[1].axis('off')
-#ax[1].set_title("Testing data (UKA, pre-processed)", fontsize=40)
-ax[2].axis('off')
 plt.tight_layout()
-#plt.show()
-fig.savefig('test.png', dpi=fig.dpi)
+plt.show()
+#fig.savefig('test.png', dpi=fig.dpi)
 plt.close(fig)
-
-fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(10, 5))
-
-test2 = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp5_x.npy")
-test_meta2 = np.load("/work/scratch/ecke/Groundtruth_Data/test/vp5_meta.npy")
-
-b = 100
-ax[0].imshow(test2[0, b, :, :], cmap='gray')
-ax[0].axis('off')
-ax[1].imshow(test2[1, b, :, :], cmap='gray')
-ax[1].axis('off')
-#ax[1].set_title("Testing data (UKA, pre-processed)", fontsize=40)
-ax[2].axis('off')
-plt.tight_layout()
-#plt.show()
-fig.savefig('test2.png', dpi=fig.dpi)
-plt.close(fig)
-"""

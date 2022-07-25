@@ -79,6 +79,7 @@ def process_test():
         brainmask, _ = load_nifti(opj(dataset, "b0_brainmask.nii.gz"))
         dwi, aff = load_nifti(opj(dataset, "dwi.nii.gz"))
         mask, _ = load_nifti(opj(dataset, "tumor_diffspace.nii.gz"))
+        segmentation, _ = load_nifti(opj(dataset, "seg_diffspace.nii.gz"))
 
         dwi = dwi * np.expand_dims(brainmask, axis=-1)
 
@@ -110,6 +111,7 @@ def process_test():
         patch_dwi = dwi[:, x1:x2, y1:y2, :]
         patch_mask = mask[x1:x2, y1:y2, :]
         patch_brainmask = brainmask[x1:x2, y1:y2, :]
+        patch_segmentation = segmentation[x1:x2, y1:y2, :]
 
         if brainmask.shape[2] == 62:
             sub = 4
@@ -121,11 +123,20 @@ def process_test():
                                                 np.zeros((*patch_mask.shape[:2], (5-sub)))), axis=-1))
         patch_brainmask = np.float32(np.concatenate((np.zeros((*patch_brainmask.shape[:2],(5-sub))), patch_brainmask,
                                                 np.zeros((*patch_brainmask.shape[:2], (5-sub)))), axis=-1))
+        patch_segmentation = np.float32(np.concatenate((np.zeros((*patch_segmentation.shape[:2], (5 - sub))), patch_segmentation,
+                                                     np.zeros((*patch_segmentation.shape[:2], (5 - sub)))), axis=-1))
+
+        # Create a white matter only mask from the segmentation mask
+        new_whitemask = np.float32(np.where(patch_segmentation == 3, 1, 0))
+
+        # Create a brainmask without csf
+        brainmask_without_csf = np.float32(np.where(patch_segmentation == 1, 0, patch_brainmask))
 
         np.save(opj(test_path, example_id), patch_dwi)
         np.save(opj(test_path, "mask"+example_id), patch_mask)
-        #print(patch_brainmask.shape)
+        np.save(opj(test_path, "whitemask" + example_id), new_whitemask)
         np.save(opj(test_path, "b0_brainmask" + example_id), patch_brainmask)
+        np.save(opj(test_path, "brainmask_withoutCSF" + example_id), brainmask_without_csf)
 
 
 def correction_uka_mask():
@@ -145,3 +156,4 @@ print("Process: Test")
 process_test()
 correction_uka_mask()
 """
+#process_test()
