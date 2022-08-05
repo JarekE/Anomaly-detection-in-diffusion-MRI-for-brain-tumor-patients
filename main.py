@@ -23,9 +23,9 @@ def main():
     # Test
     if config.mode == "test":
 
-        if os.path.exists("logs/DataDropOff"):
-            shutil.rmtree("logs/DataDropOff")
-        os.mkdir("logs/DataDropOff")
+        if os.path.exists("logs/DataDropOff" + str(config.test_this_model)):
+            shutil.rmtree("logs/DataDropOff" + str(config.test_this_model))
+        os.mkdir("logs/DataDropOff"+str(config.test_this_model))
 
         path = postprocessing.prepare_results()
         model = LearningModule.load_from_checkpoint(path)
@@ -33,6 +33,8 @@ def main():
         trainer = pl.Trainer(gpus=1)
         trainer.test(model, test_dataloaders=dataloader.test_dataloader())
         postprocessing.processing()
+
+        shutil.rmtree("logs/DataDropOff" + str(config.test_this_model))
         quit()
 
     # Load

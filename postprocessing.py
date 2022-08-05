@@ -31,7 +31,7 @@ def quantitative_analysis(map, mask, name):
     map = map[map != 0]
 
     # Precision Recall Curve
-    if 1:
+    if 0:
       lr_precision, lr_recall, thresholds = precision_recall_curve(binary_tumor_mask, map)
       lr_auc = auc(lr_recall, lr_precision)
       # summarize scores
@@ -50,7 +50,7 @@ def quantitative_analysis(map, mask, name):
       pyplot.show()
 
     # ROC Curve
-    if 1:
+    if 0:
         ns_probs = [0 for _ in range(len(binary_tumor_mask))]
         # calculate scores
         ns_auc = roc_auc_score(binary_tumor_mask, ns_probs)
@@ -79,7 +79,7 @@ def postprocessing(result, input, brainmask, name, mask):
     map = np.subtract(input, result)
     map_mean = np.mean(map, axis=0)
     map_mean = np.absolute(map_mean)
-    # Brainmask !!! NO CSF !!!
+    # Brainmask !!! without CSF !!!
     map_mean[brainmask == 0] = 0
 
     ### NEW (only tested for VanillaVAE) ###
@@ -198,7 +198,7 @@ def processing():
 
     if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
         # Load all the data
-        output_path = glob(opj('logs/DataDropOff', "batch*"))
+        output_path = glob(opj('logs/DataDropOff' + str(config.test_this_model), "batch*"))
         output_path.sort()
         id_list = []
         latentspace_list = []
