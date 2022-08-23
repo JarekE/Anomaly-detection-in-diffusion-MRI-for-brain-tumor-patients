@@ -17,15 +17,15 @@ def main():
 
     # Reset
     torch.cuda.empty_cache()
-    seed_everything(42)
+    #seed_everything(42)
     print(config.args)
 
     # Test
     if config.mode == "test":
 
-        if os.path.exists("logs/DataDropOff" + str(config.test_this_model)):
-            shutil.rmtree("logs/DataDropOff" + str(config.test_this_model))
-        os.mkdir("logs/DataDropOff"+str(config.test_this_model))
+        if os.path.exists(config.data_drop_off): 
+            shutil.rmtree(config.data_drop_off)
+        os.makedirs(config.data_drop_off)
 
         path = postprocessing.prepare_results()
         model = LearningModule.load_from_checkpoint(path)
@@ -34,7 +34,7 @@ def main():
         trainer.test(model, test_dataloaders=dataloader.test_dataloader())
         postprocessing.processing()
 
-        shutil.rmtree("logs/DataDropOff" + str(config.test_this_model))
+        shutil.rmtree(config.data_drop_off)
         quit()
 
     # Load

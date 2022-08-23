@@ -6,6 +6,7 @@ from glob import glob
 from dipy.io.image import load_nifti
 from dipy.io import read_bvals_bvecs
 from os.path import join as opj
+from scipy import ndimage
 
 # Get data
 PATH = "/work/scratch/ecke/Unprocessed_Data"
@@ -129,8 +130,10 @@ def process_test():
         # Create a white matter only mask from the segmentation mask
         new_whitemask = np.float32(np.where(patch_segmentation == 3, 1, 0))
 
+        # Erosion of the edited brainmask
+        brainmask_edited = ndimage.binary_erosion(patch_brainmask, structure=np.ones((2,2,2))).astype(patch_brainmask.dtype)
         # Create a brainmask without csf
-        brainmask_without_csf = np.float32(np.where(patch_segmentation == 1, 0, patch_brainmask))
+        brainmask_without_csf = np.float32(np.where(patch_segmentation == 1, 0, brainmask_edited))
 
         np.save(opj(test_path, example_id), patch_dwi)
         np.save(opj(test_path, "mask"+example_id), patch_mask)
@@ -156,4 +159,4 @@ print("Process: Test")
 process_test()
 correction_uka_mask()
 """
-#process_test()
+process_test()

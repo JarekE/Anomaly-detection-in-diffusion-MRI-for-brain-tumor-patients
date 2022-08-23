@@ -7,70 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.util import montage
 from scipy import ndimage
-from skimage import filters
 import pickle
-from sklearn.metrics import precision_recall_curve
-from sklearn.metrics import f1_score
-from sklearn.metrics import auc
-from matplotlib import pyplot
-from sklearn.metrics import roc_curve
-from sklearn.metrics import roc_auc_score
+#from skimage.morphology import binary_opening
+from scipy.ndimage.morphology import binary_opening
 
 import config
-
-"""
-Delete this function, as soon as I have the general function as extern-script
-"""
-def quantitative_analysis(map, mask, name):
-    # data preparation
-    binary_tumor_mask = mask
-    binary_tumor_mask[binary_tumor_mask > 0] = 1
-    map = map.flatten()
-    binary_tumor_mask = binary_tumor_mask.flatten()
-    binary_tumor_mask = binary_tumor_mask[map != 0]
-    map = map[map != 0]
-
-    # Precision Recall Curve
-    if 0:
-      lr_precision, lr_recall, thresholds = precision_recall_curve(binary_tumor_mask, map)
-      lr_auc = auc(lr_recall, lr_precision)
-      # summarize scores
-      print('Numeric value: auc=%.3f' % (lr_auc))
-
-      # plot the precision-recall curves
-      no_skill = len(binary_tumor_mask[binary_tumor_mask == 1]) / len(binary_tumor_mask)
-      pyplot.plot([0, 1], [no_skill, no_skill], linestyle='--', label='No Skill')
-      pyplot.plot(lr_recall, lr_precision, marker='.', label='Network')
-      # axis labels
-      pyplot.xlabel('Recall')
-      pyplot.ylabel('Precision')
-      # show the legend
-      pyplot.legend()
-      # show the plot
-      pyplot.show()
-
-    # ROC Curve
-    if 0:
-        ns_probs = [0 for _ in range(len(binary_tumor_mask))]
-        # calculate scores
-        ns_auc = roc_auc_score(binary_tumor_mask, ns_probs)
-        lr_auc = roc_auc_score(binary_tumor_mask, map)
-        # summarize scores
-        print('No Skill: ROC AUC=%.3f' % (ns_auc))
-        print('Logistic: ROC AUC=%.3f' % (lr_auc))
-        # calculate roc curves
-        ns_fpr, ns_tpr, _ = roc_curve(binary_tumor_mask, ns_probs)
-        lr_fpr, lr_tpr, _ = roc_curve(binary_tumor_mask, map)
-        # plot the roc curve for the model
-        pyplot.plot(ns_fpr, ns_tpr, linestyle='--', label='No Skill')
-        pyplot.plot(lr_fpr, lr_tpr, marker='.', label='Model')
-        # axis labels
-        pyplot.xlabel('False Positive Rate')
-        pyplot.ylabel('True Positive Rate')
-        # show the legend
-        pyplot.legend()
-        # show the plot
-        pyplot.show()
 
 
 def postprocessing(result, input, brainmask, name, mask):
@@ -79,17 +20,17 @@ def postprocessing(result, input, brainmask, name, mask):
     map = np.subtract(input, result)
     map_mean = np.mean(map, axis=0)
     map_mean = np.absolute(map_mean)
-    # Brainmask !!! without CSF !!!
+    # Brainmask !!! without CSF and with erosion !!!
     map_mean[brainmask == 0] = 0
 
-    ### NEW (only tested for VanillaVAE) ###
-    quantitative_analysis(map_mean, mask, name)
-
     # Set to 0 for better visualization
-    map_mean[map_mean < 0.2] = 0
+    #map_mean[map_mean < 0.2] = 0
 
     # !!! NO CSF !!!
-    result_images(map_mean, name, mask, cmap="hot")
+    result_images(map_mean, name, mask, cmap="hot", note="hot")
+    result_images(map_mean, name, mask, cmap="gray", note="gray")
+    result_images(binary_opening(np.where(map_mean >= 0.5, 1, 0), structure=np.ones((3,3,3))).astype(int), name, mask, cmap="gray", note="opening")
+
     print("Save map: ", name)
     np.save(opj(config.results_path, 'map_') + name, map_mean)
 
@@ -103,24 +44,34 @@ def prepare_results():
     return path
 
 
-def result_images(map, name, mask, cmap):
-    mask_dil = ndimage.binary_dilation(mask, iterations=2)
-    mask_contour = mask_dil - mask
-
-    # Rotate image (not data!) for optimal visual output
-    mask_contour = np.flip(np.flip(np.swapaxes(mask_contour, 0, 2), axis=0), axis=1)
+def result_images(map, name, mask, cmap, note):
     map = np.flip(np.flip(np.swapaxes(map, 0, 2), axis=0), axis=1)
 
-    # print image
-    fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
-    ax1.imshow(montage(map), cmap=cmap)
-    mask_contour = mask_contour.astype(float)
-    mask_contour[mask_contour > 0.5] = 1
-    mask_contour[mask_contour <= 0.5] = np.nan
-    ax1.imshow(montage(mask_contour), 'binary', alpha=1)
-    path = opj(config.results_path, 'image_map_' + name + '.png')
-    fig.savefig(path)
-    plt.close(fig)
+    if cmap == "hot":
+        mask_dil = ndimage.binary_dilation(mask, iterations=2)
+        mask_contour = mask_dil - mask
+
+        # Rotate image (not data!) for optimal visual output
+        mask_contour = np.flip(np.flip(np.swapaxes(mask_contour, 0, 2), axis=0), axis=1)
+
+        # print image
+        fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
+        ax1.imshow(montage(map), cmap=cmap)
+        mask_contour = mask_contour.astype(float)
+        mask_contour[mask_contour > 0.5] = 1
+        mask_contour[mask_contour <= 0.5] = np.nan
+        ax1.imshow(montage(mask_contour), 'binary', alpha=1)
+        path = opj(config.results_path, 'image_map_' + name + note + '.png')
+        fig.savefig(path)
+        plt.close(fig)
+    else:
+        map = np.where(map >= 0.5, 1, 0)
+        fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
+        ax1.imshow(montage(map), cmap=cmap)
+        path = opj(config.results_path, 'image_map_' + name + note + '.png')
+        fig.savefig(path)
+        plt.close(fig)
+
     return
 
 
@@ -130,8 +81,6 @@ CORRECT FUNKTION
 TODO: !!
 
 """
-
-
 def latentspace_analysis(space, brainmask, mask):
     mu_brain, mu_brain2, log_var_brain, mu_tumor, mu_tumor2, log_var_tumor = [], [], [], [], [], []
 
@@ -198,7 +147,7 @@ def processing():
 
     if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
         # Load all the data
-        output_path = glob(opj('logs/DataDropOff' + str(config.test_this_model), "batch*"))
+        output_path = glob(opj(config.data_drop_off, "batch*"))
         output_path.sort()
         id_list = []
         latentspace_list = []
@@ -269,10 +218,6 @@ def processing():
         output = np.load(output_path[i])
         name = input_path[i].split("/")[-1]
         print(name)
-
-        ## TEST
-        result_images(np.mean(output, axis=0), name + "_raw", mask, cmap="gray")
-        ## TEST
 
         postprocessing(output, input, brainmask, name, mask)
 

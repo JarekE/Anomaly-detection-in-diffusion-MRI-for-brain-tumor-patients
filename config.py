@@ -34,36 +34,35 @@ else:
 vanilla_params = {"LR": 0.00005,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95,
-  "kld_weight": 0.0000122,      # (input.shape.flatten / latent space dimensions)^-1
-  "manual_seed": 1265}
+  "kld_weight": 0.0000122}      # (input.shape.flatten / latent space dimensions)^-1}
 
 spatialvae_params = {"LR": 0.0005,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95,
-  "kld_weight": 0.002,      # (input.shape.flatten / latent space dimensions)^-1
-  "manual_seed": 1265}
+  "kld_weight": 0.002      # (input.shape.flatten / latent space dimensions)^-1
+  }
 
 voxelvae_params = {"LR": 0.00001,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95,
-  "kld_weight": 0.0625,      # (input.shape.flatten / latent space dimensions)^-1
-  "manual_seed": 1265}
+  "kld_weight": 0.0625      # (input.shape.flatten / latent space dimensions)^-1
+  }
 
 cnnvoxelvae_params = {"LR": 0.00001,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95,
-  "kld_weight": 0.0025,      # (input.shape.flatten / latent space dimensions)^-1
-  "manual_seed": 1265}
+  "kld_weight": 0.0025     # (input.shape.flatten / latent space dimensions)^-1
+  }
 
 unet_params = {"LR": 0.0001,
   "weight_decay": 0.0,
   "scheduler_gamma": None,
-  "kld_weight": False,
-  "manual_seed": 1265}
+  "kld_weight": False}
 
 # Load data. Training data is randomly shuffled.
 img_path_uka = '/work/scratch/ecke/Masterarbeit/Data'
 train = glob(opj(img_path_uka, "Train", "vp*"))
+train.shuffle()
 test = glob(opj(img_path_uka, "Test", "vp*"))
 test.sort()
 test_mask = glob(opj(img_path_uka, "Test", "mask*"))
@@ -79,6 +78,7 @@ log_dir = "/work/scratch/ecke/Masterarbeit/logs/Callback"
 log_dir_logger = "/work/scratch/ecke/Masterarbeit/logs/Logger"
 save_path = opj("/work/scratch/ecke/Masterarbeit/logs/Callback", test_this_model)
 results_path = opj("/work/scratch/ecke/Masterarbeit/Results", test_this_model)
+data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model)
 
 if network == "VanillaVAE":
   file_name = network + '-{epoch:02d}-{val_loss:.2f}-max_epochs=' + str(epochs) + '-latent_dim=' + str(latent_dim)
