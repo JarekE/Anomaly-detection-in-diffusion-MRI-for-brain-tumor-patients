@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+"""
+
+To be deleted!!
+
+"""
 
 class UNet3d(nn.Module):
     def __init__(self,

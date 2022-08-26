@@ -33,7 +33,7 @@ def process_train():
         dwi = dwi * np.expand_dims(brainmask, axis=-1)
 
         bvals, bvecs = read_bvals_bvecs(opj(dataset, b_name+"bvals"), opj(dataset, b_name+"bvecs"))
-        bvals = np.around(bvals / 1000).astype(np.int) * 1000
+        bvals = np.around(bvals / 1000).astype(int) * 1000
         print(bvals)
 
         # scale the b-values between 1 and 0 (Diffusionsabschwächung)
@@ -65,6 +65,10 @@ def process_train():
         patch_brainmask = np.float32(np.concatenate((np.zeros((*patch_brainmask.shape[:2], 5)), patch_brainmask,
                                                np.zeros((*patch_brainmask.shape[:2], 5))), axis=-1))
 
+        # Erosion of data
+        patch_brainmask = ndimage.binary_erosion(patch_brainmask, structure=np.ones((3, 3, 3))).astype(patch_brainmask.dtype)
+        patch_dwi = np.where(patch_brainmask > 0, patch_dwi, 0)
+
         np.save(opj(train_path, example_id), patch_dwi)
         np.save(opj(train_path, 'b0_brainmask_'+example_id), patch_brainmask)
 
@@ -85,7 +89,7 @@ def process_test():
         dwi = dwi * np.expand_dims(brainmask, axis=-1)
 
         bvals, bvecs = read_bvals_bvecs(opj(dataset, "bvals"), opj(dataset, "bvecs"))
-        bvals = np.around(bvals / 1000).astype(np.int) * 1000
+        bvals = np.around(bvals / 1000).astype(int) * 1000
         #print(bvals)
 
         # scale the b-values between 1 and 0 (Diffusionsabschwächung)
@@ -130,10 +134,15 @@ def process_test():
         # Create a white matter only mask from the segmentation mask
         new_whitemask = np.float32(np.where(patch_segmentation == 3, 1, 0))
 
-        # Erosion of the edited brainmask
-        brainmask_edited = ndimage.binary_erosion(patch_brainmask, structure=np.ones((2,2,2))).astype(patch_brainmask.dtype)
-        # Create a brainmask without csf
-        brainmask_without_csf = np.float32(np.where(patch_segmentation == 1, 0, brainmask_edited))
+        # Erosion of data
+        patch_brainmask = ndimage.binary_erosion(patch_brainmask, structure=np.ones((3, 3, 3))).astype(patch_brainmask.dtype)
+
+        brainmask_without_csf = np.float32(np.where(patch_segmentation == 1, 0, patch_brainmask))
+
+        patch_mask = np.where(patch_brainmask > 0, patch_mask, 0)
+        new_whitemask = np.where(patch_brainmask > 0, new_whitemask, 0)
+        patch_dwi = np.where(patch_brainmask > 0, patch_dwi, 0)
+        brainmask_without_csf = np.where(patch_brainmask > 0, brainmask_without_csf, 0)
 
         np.save(opj(test_path, example_id), patch_dwi)
         np.save(opj(test_path, "mask"+example_id), patch_mask)
@@ -154,9 +163,11 @@ def correction_uka_mask():
 
 # Need new data? Lets go!
 """
+print("Process: Train")
 process_train()
 print("Process: Test")
 process_test()
 correction_uka_mask()
 """
-process_test()
+#process_test()
+#process_train()

@@ -14,6 +14,7 @@ parser.add_argument("-e", "--epochs", default=200, type=int, help="Number of epo
 parser.add_argument("-n", "--network", default="CNNVoxelVAE", help="Name of Network: VanillaVAE, SpatialVAE, VoxelVAE or UNet.")
 parser.add_argument("-a", "--augmentation", default=False, type=bool, help="Augment the data by nonlinear transformations and inpaintings. Currently not availabe for VoxelVAE.")
 parser.add_argument("-l", "--latent_dim", default=256, type=int, help="Dimension of latent space, currently only available for VanillaVAE")
+parser.add_argument("-r", "--run", default=1, type=int, help="New parameter to train network with same parameter at the same time")
 args = vars(parser.parse_args())
 mode = args["mode"]
 test_this_model = args["test_this_model"]
@@ -21,6 +22,7 @@ epochs = args["epochs"]
 network = args["network"]
 augmentation = args["augmentation"]
 latent_dim = args["latent_dim"]
+run = args["run"]
 
 # For full images, we have only 28. 4 is a power of 2 and a divider of 28.
 if (network == "VoxelVAE"):
@@ -59,10 +61,14 @@ unet_params = {"LR": 0.0001,
   "scheduler_gamma": None,
   "kld_weight": False}
 
+rec_disc_params = {"LR": 0.0001,
+  "weight_decay": 0.0,
+  "scheduler_gamma": None}
+
 # Load data. Training data is randomly shuffled.
 img_path_uka = '/work/scratch/ecke/Masterarbeit/Data'
 train = glob(opj(img_path_uka, "Train", "vp*"))
-train.shuffle()
+random.shuffle(train)
 test = glob(opj(img_path_uka, "Test", "vp*"))
 test.sort()
 test_mask = glob(opj(img_path_uka, "Test", "mask*"))
@@ -80,7 +86,4 @@ save_path = opj("/work/scratch/ecke/Masterarbeit/logs/Callback", test_this_model
 results_path = opj("/work/scratch/ecke/Masterarbeit/Results", test_this_model)
 data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model)
 
-if network == "VanillaVAE":
-  file_name = network + '-{epoch:02d}-{val_loss:.2f}-max_epochs=' + str(epochs) + '-latent_dim=' + str(latent_dim)
-else:
-  file_name = network+'-{epoch:02d}-{val_loss:.2f}-max_epochs='+str(epochs)
+file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-run=' + str(run) + '-max_epochs=' + str(epochs) + '-latent_dim=' + str(latent_dim)

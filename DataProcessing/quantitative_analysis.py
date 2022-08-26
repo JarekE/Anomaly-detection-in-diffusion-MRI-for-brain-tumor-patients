@@ -170,7 +170,7 @@ Add all results to compare
 
 """
 
-analysis_results = "/work/scratch/ecke/Masterarbeit/Results/Baseline_Validation1+2+3"
+analysis_results = "/work/scratch/ecke/Masterarbeit/Results/Baseline_Validation1+2+3_withErosion"
 
 result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results/Baseline_Validation1", "VanillaVAE*"))
 list_run1 = quantitative_analysis(result_list)

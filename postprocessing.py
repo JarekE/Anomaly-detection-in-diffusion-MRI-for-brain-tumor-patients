@@ -14,7 +14,7 @@ from scipy.ndimage.morphology import binary_opening
 import config
 
 
-def postprocessing(result, input, brainmask, name, mask):
+def postprocessing_baseline(result, input, brainmask, name, mask):
     result /= result.max()
     # L1 loss
     map = np.subtract(input, result)
@@ -34,6 +34,45 @@ def postprocessing(result, input, brainmask, name, mask):
     print("Save map: ", name)
     np.save(opj(config.results_path, 'map_') + name, map_mean)
 
+def postprocessing_voxel(result, input, brainmask, name, mask):
+    result /= result.max()
+    # L1 loss
+    map = np.subtract(input, result)
+    map_mean = np.mean(map, axis=0)
+    map_mean = np.absolute(map_mean)
+    # Brainmask !!! without CSF and with erosion !!!
+    map_mean[brainmask == 0] = 0
+
+    # Set to 0 for better visualization
+    #map_mean[map_mean < 0.2] = 0
+
+    # !!! NO CSF !!!
+    result_images(map_mean, name, mask, cmap="hot", note="hot")
+    result_images(map_mean, name, mask, cmap="gray", note="gray")
+    result_images(binary_opening(np.where(map_mean >= 0.5, 1, 0), structure=np.ones((3,3,3))).astype(int), name, mask, cmap="gray", note="opening")
+
+    print("Save map: ", name)
+    np.save(opj(config.results_path, 'map_') + name, map_mean)
+
+def postprocessing_reddisc(result, input, brainmask, name, mask):
+    result /= result.max()
+    # L1 loss
+    map = np.subtract(input, result)
+    map_mean = np.mean(map, axis=0)
+    map_mean = np.absolute(map_mean)
+    # Brainmask !!! without CSF and with erosion !!!
+    map_mean[brainmask == 0] = 0
+
+    # Set to 0 for better visualization
+    #map_mean[map_mean < 0.2] = 0
+
+    # !!! NO CSF !!!
+    result_images(map_mean, name, mask, cmap="hot", note="hot")
+    result_images(map_mean, name, mask, cmap="gray", note="gray")
+    result_images(binary_opening(np.where(map_mean >= 0.5, 1, 0), structure=np.ones((3,3,3))).astype(int), name, mask, cmap="gray", note="opening")
+
+    print("Save map: ", name)
+    np.save(opj(config.results_path, 'map_') + name, map_mean)
 
 def prepare_results():
     path = config.save_path
@@ -197,13 +236,9 @@ def processing():
             name = id_list[i]
             np.save(opj(config.results_path, 'raw_output_') + name, np.float32(result))
 
+            # Postprocessing of Approach 3
             latentspace_analysis(latent_space, brainmask, mask)
-
-            ## TEST
-            result_images(np.mean(result, axis=0), name + "_raw", mask, cmap="gray")
-            ## TEST
-
-            postprocessing(result, input, brainmask, name, mask)
+            postprocessing_voxel(result, input, brainmask, name, mask)
 
         return
 
@@ -213,12 +248,16 @@ def processing():
     for i in range(len(input_path)):
         input = np.load(input_path[i])
         mask = np.load(mask_path[i])
-        # !!! NO CSF !!!
+        # !!! NO CSF and with erosion!!!
         brainmask = np.load(brainmask_path[i])
         output = np.load(output_path[i])
         name = input_path[i].split("/")[-1]
         print(name)
 
-        postprocessing(output, input, brainmask, name, mask)
+        if config.network == "VanillaVAE":
+            postprocessing_baseline(output, input, brainmask, name, mask)
+        if config.network == "RecDisc":
+            postprocessing_reddisc(output, input, brainmask, name, mask)
+
 
     return

@@ -237,18 +237,43 @@ def final_data_train():
         fig.savefig(path)
         plt.close(fig)
 
+def show_RecDisc(input, input_anomaly, reconstructive_map, results, z, reconstruction):
+    fig, ax = plt.subplots(nrows=1, ncols=6, figsize=(10, 5))
+    ax[0].imshow(input.cpu().numpy()[2, 30, :, :, z], cmap='gray')
+    ax[0].axis('off')
+    ax[0].title.set_text("Input")
+    ax[1].imshow(input_anomaly.cpu().numpy()[2, 30, :, :, z], cmap='gray')
+    ax[1].axis('off')
+    ax[1].title.set_text("Anomaly")
+    ax[2].imshow(reconstructive_map.cpu().numpy()[2, 0, :, :, z], cmap='gray')
+    ax[2].axis('off')
+    ax[2].title.set_text("GroundTruth")
+    ax[3].imshow(results.cpu().numpy()[2, 0, :, :, z], cmap='gray')
+    ax[3].axis('off')
+    ax[3].title.set_text("Result")
+    ax[4].imshow(np.where(results.cpu().numpy() > 0.5, 1, 0)[2, 0, :, :, z], cmap='gray')
+    ax[4].axis('off')
+    ax[4].title.set_text("0.5")
+    ax[5].imshow(reconstruction.cpu().numpy()[2, 30, :, :, z], cmap='gray')
+    ax[5].axis('off')
+    ax[5].title.set_text("(Reconstruction)")
+    plt.tight_layout()
+    plt.show()
+    plt.close(fig)
+    return
+
 #final_data_test()
 #final_data_train()
 #tumor_diffspace_control()
 
-
+"""
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
 
 test = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/maskvp1.npy")
 test_brainmask = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/brainmask_withoutCSFvp1.npy")
 
 b = 35
-ax[0].imshow(test[:, :, b], cmap='gray')
+ax[0].imshow(test[:, :, b], cmap='gray') 
 ax[0].axis('off')
 ax[1].imshow(test_brainmask[:, :, b], cmap='gray')
 ax[1].axis('off')
@@ -256,3 +281,4 @@ plt.tight_layout()
 plt.show()
 #fig.savefig('test.png', dpi=fig.dpi)
 plt.close(fig)
+"""

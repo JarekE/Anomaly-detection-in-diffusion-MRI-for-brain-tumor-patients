@@ -2,17 +2,14 @@
 import torch
 from pytorch_lightning.core.lightning import LightningModule
 from Models.VAE import VanillaVAE, SpatialVAE, VoxelVAE, CNNVoxelVAE
-import torch.nn as nn
+from Models.RecDiscModel import RecDisc
 from torch import optim
-import matplotlib.pyplot as plt
 import numpy as np
 from os.path import join as opj
 from Models.UNet import UNet3d
 import pickle
-import os
-import shutil
-
 import config
+from DataProcessing.data_visualization import show_RecDisc
 
 
 class LearningModule(LightningModule):
@@ -36,6 +33,9 @@ class LearningModule(LightningModule):
         elif config.network == "CNNVoxelVAE":
             self.model = CNNVoxelVAE(in_channels=64)
             self.params = config.cnnvoxelvae_params
+        elif config.network == "RecDisc":
+            self.model = RecDisc(in_channels=64, in_channels_unet=64*2)
+            self.params = config.rec_disc_params
         else:
             raise ValueError('You chose a network that is not available atm: '+config.network)
 
@@ -49,12 +49,13 @@ class LearningModule(LightningModule):
         target = batch['target']
         input = batch['input']
 
-        results = self.forward(input)
-
-        results.append(target)
-
-        train_loss = self.model.loss_function(*results,
-                                              M_N=self.params['kld_weight'])
+        if config.network == "RecDisc":
+            results = self.forward(input)
+            train_loss = self.model.loss_function(*results)
+        else:
+            results = self.forward(input)
+            results.append(target)
+            train_loss = self.model.loss_function(*results, M_N=self.params['kld_weight'])
 
         self.log_dict({key: val.item() for key, val in train_loss.items()}, sync_dist=True)
 
@@ -64,14 +65,16 @@ class LearningModule(LightningModule):
         target = batch['target']
         input = batch['input']
 
-        results = self.forward(input)
+        if config.network == "RecDisc":
+            results = self.forward(input)
+            val_loss = self.model.loss_function(*results)
+            show_RecDisc(input, results[5], results[2], results[0], results[3], results[6])
+        else:
+            results = self.forward(input)
+            results.append(target)
+            val_loss = self.model.loss_function(*results, M_N=self.params['kld_weight'])
 
-        results.append(target)
-
-        val_loss = self.model.loss_function(*results,
-                                            M_N=self.params['kld_weight'])
         print(val_loss.items())
-
         self.log_dict({f"val_{key}": val.item() for key, val in val_loss.items()}, sync_dist=True)
 
     def test_step(self, batch, batch_idx):
