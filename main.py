@@ -4,14 +4,13 @@ import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-
 from LearningModule import LearningModule
 from Dataloader import DataModule
 import config
 import postprocessing
 import os
 import shutil
-
+ 
 
 def main():
 
@@ -59,6 +58,25 @@ def main():
                          log_every_n_steps=10)
 
     trainer.fit(model, datamodule=dataloader)
+
+    # Automate testing after each run (remember: analysis is still extern and testing can also be run extern)
+    where_is_checkpoint = callbacks.best_model_path
+    test_id = where_is_checkpoint.split("/")[-1]
+    config.create_id(test_id)
+
+    if os.path.exists(config.data_drop_off):
+        shutil.rmtree(config.data_drop_off)
+    os.makedirs(config.data_drop_off)
+
+    path = postprocessing.prepare_results()
+    model = LearningModule.load_from_checkpoint(path)
+    dataloader = DataModule()
+    trainer = pl.Trainer(gpus=1)
+    trainer.test(model, test_dataloaders=dataloader.test_dataloader())
+    postprocessing.processing()
+
+    shutil.rmtree(config.data_drop_off)
+
 
 if __name__ == "__main__":
     main()

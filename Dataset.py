@@ -105,10 +105,10 @@ class UKADataset(Dataset):
 
         print("\n Loading data...")
         for subject in tqdm(self.subject_ids):
+            mask_id = subject.split("/")[-1]
 
             if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
                 patch = np.load(subject)
-                mask_id = subject.split("/")[-1]
                 if self.type == "test":
                     b0_mask = np.load(config.img_path_uka+'/Test/b0_brainmask'+mask_id)
                 else:
@@ -137,7 +137,7 @@ class UKADataset(Dataset):
                         voxel_target = patch[:, (idx[0]-1):(idx[0]+2), (idx[1]-1):(idx[1]+2), (idx[2]-1):(idx[2]+2)]
 
                         #if voxel_input.shape != (64,3,3,3):
-                        #    a = 1
+                        #    a = 1subject.split("/")[-1]
                     else:
                         voxel_input = patch[:, idx[0], idx[1], idx[2]]
                         voxel_target = patch[:, idx[0], idx[1], idx[2]]
@@ -149,7 +149,12 @@ class UKADataset(Dataset):
             else:
                 patch = np.load(subject)
                 target = patch
-                self.patches.append((patch, target, subject))
+                if self.type == "test":
+                    mask_without_csf = np.load('/work/scratch/ecke/Masterarbeit/Data/Test/brainmask_withoutCSF'+ mask_id)
+                else:
+                    mask_without_csf = np.load('/work/scratch/ecke/Masterarbeit/Data/Train/brainmask_withoutCSF'+ mask_id)
+
+                self.patches.append((patch, target, subject, mask_without_csf))
 
                 if (type != "test") and (config.augmentation == True):
                     nonlinear_patch, inpainting_patch = data_augmentation(patch)
@@ -169,4 +174,5 @@ class UKADataset(Dataset):
         else:
             return {"input": self.patches[idx][0],
                     "target": self.patches[idx][1],
-                    "id": self.patches[idx][2]}
+                    "id": self.patches[idx][2],
+                    "mask_withoutCSF": self.patches[idx][3]}

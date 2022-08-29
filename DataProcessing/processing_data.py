@@ -7,6 +7,7 @@ from dipy.io.image import load_nifti
 from dipy.io import read_bvals_bvecs
 from os.path import join as opj
 from scipy import ndimage
+import matplotlib.pyplot as plt
 
 # Get data
 PATH = "/work/scratch/ecke/Unprocessed_Data"
@@ -29,6 +30,7 @@ def process_train():
 
         brainmask, _ = load_nifti(opj(dataset, "b0_brainmask.nii.gz"))
         dwi, aff = load_nifti(opj(dataset, "dwi.nii.gz"))
+        segmentation, _ = load_nifti(opj(dataset, "seg_diffspace.nii.gz"))
 
         dwi = dwi * np.expand_dims(brainmask, axis=-1)
 
@@ -59,19 +61,25 @@ def process_train():
         y2 = y // 2 + 40
 
         patch_dwi = dwi[:, x1:x2, y1:y2, :]
+        patch_segmentation = segmentation[x1:x2, y1:y2, :]
+
         patch_dwi = np.float32(np.concatenate((np.zeros((*patch_dwi.shape[:3], 5)), patch_dwi,
                                                np.zeros((*patch_dwi.shape[:3], 5))), axis=-1))
         patch_brainmask = brainmask[x1:x2, y1:y2, :]
         patch_brainmask = np.float32(np.concatenate((np.zeros((*patch_brainmask.shape[:2], 5)), patch_brainmask,
                                                np.zeros((*patch_brainmask.shape[:2], 5))), axis=-1))
+        patch_segmentation = np.float32(np.concatenate((np.zeros((*patch_segmentation.shape[:2], 5)), patch_segmentation,
+                            np.zeros((*patch_segmentation.shape[:2], 5))), axis=-1))
 
         # Erosion of data
         patch_brainmask = ndimage.binary_erosion(patch_brainmask, structure=np.ones((3, 3, 3))).astype(patch_brainmask.dtype)
+
         patch_dwi = np.where(patch_brainmask > 0, patch_dwi, 0)
+        brainmask_without_csf = np.float32(np.where(patch_segmentation == 1, 0, patch_brainmask))
 
         np.save(opj(train_path, example_id), patch_dwi)
         np.save(opj(train_path, 'b0_brainmask_'+example_id), patch_brainmask)
-
+        np.save(opj(train_path, "brainmask_withoutCSF" + example_id), brainmask_without_csf)
 
 # Tumor data + masks.
 def process_test():
@@ -162,12 +170,9 @@ def correction_uka_mask():
 
 
 # Need new data? Lets go!
-"""
-print("Process: Train")
-process_train()
-print("Process: Test")
-process_test()
-correction_uka_mask()
-"""
-#process_test()
+
+#print("Process: Train")
 #process_train()
+#print("Process: Test")
+#process_test()
+#correction_uka_mask()

@@ -7,12 +7,6 @@ import os
 from glob import glob
 from skimage.util import montage
 import shutil
-from os.path import join as opj
-
-
-def raw_output():
-    ...
-
 
 def preview_images():
 
@@ -202,8 +196,8 @@ def final_data_test():
 
         # print image
         fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
-        # Use first bvec-image (random, can be other)
-        ax1.imshow(montage(test_image[0, :, :, :]), cmap='gray')
+        # mean
+        ax1.imshow(montage(np.mean(test_image, axis=0)[:, :, :]), cmap='gray')
         # do not pint background values == 0
         test_mask = test_mask.astype(float)
         test_mask[test_mask == 0] = np.nan
@@ -238,25 +232,43 @@ def final_data_train():
         plt.close(fig)
 
 def show_RecDisc(input, input_anomaly, reconstructive_map, results, z, reconstruction):
-    fig, ax = plt.subplots(nrows=1, ncols=6, figsize=(10, 5))
-    ax[0].imshow(input.cpu().numpy()[2, 30, :, :, z], cmap='gray')
-    ax[0].axis('off')
-    ax[0].title.set_text("Input")
-    ax[1].imshow(input_anomaly.cpu().numpy()[2, 30, :, :, z], cmap='gray')
-    ax[1].axis('off')
-    ax[1].title.set_text("Anomaly")
-    ax[2].imshow(reconstructive_map.cpu().numpy()[2, 0, :, :, z], cmap='gray')
-    ax[2].axis('off')
-    ax[2].title.set_text("GroundTruth")
-    ax[3].imshow(results.cpu().numpy()[2, 0, :, :, z], cmap='gray')
-    ax[3].axis('off')
-    ax[3].title.set_text("Result")
-    ax[4].imshow(np.where(results.cpu().numpy() > 0.5, 1, 0)[2, 0, :, :, z], cmap='gray')
-    ax[4].axis('off')
-    ax[4].title.set_text("0.5")
-    ax[5].imshow(reconstruction.cpu().numpy()[2, 30, :, :, z], cmap='gray')
-    ax[5].axis('off')
-    ax[5].title.set_text("(Reconstruction)")
+    fig, ax = plt.subplots(nrows=2, ncols=6, figsize=(10, 5))
+    ax[0,0].imshow(input.detach().cpu().numpy()[2, 30, :, :, z], cmap='gray')
+    ax[0,0].axis('off')
+    ax[0,0].title.set_text("Data 30/64")
+    ax[0,1].imshow(input_anomaly.detach().cpu().numpy()[2, 30, :, :, z], cmap='gray')
+    ax[0,1].axis('off')
+    ax[0,1].title.set_text("Input 30/64")
+    ax[0,2].imshow(reconstruction.detach().cpu().numpy()[2, 30, :, :, z], cmap='gray')
+    ax[0,2].axis('off')
+    ax[0,2].title.set_text("Reconstruction 30/64")
+    ax[0,3].imshow(reconstructive_map.detach().cpu().numpy()[2, 0, :, :, z], cmap='gray')
+    ax[0,3].axis('off')
+    ax[0,3].title.set_text("GroundTruth")
+    ax[0,4].imshow(results.detach().cpu().numpy()[2, 0, :, :, z], cmap='gray')
+    ax[0,4].axis('off')
+    ax[0,4].title.set_text("Result")
+    ax[0,5].imshow(np.where(results.detach().cpu().numpy() > 0.5, 1, 0)[2, 0, :, :, z], cmap='gray')
+    ax[0,5].axis('off')
+    ax[0,5].title.set_text("0.5")
+    ax[1,0].imshow(np.mean(input.detach().cpu().numpy(), axis=1)[2, :, :, z], cmap='gray')
+    ax[1,0].axis('off')
+    ax[1,0].title.set_text("Data Mean")
+    ax[1,1].imshow(np.mean(input_anomaly.detach().cpu().numpy(), axis=1)[2, :, :, z], cmap='gray')
+    ax[1,1].axis('off')
+    ax[1,1].title.set_text("Input Mean")
+    ax[1,2].imshow(np.mean(reconstruction.detach().cpu().numpy(), axis=1)[2, :, :, z], cmap='gray')
+    ax[1,2].axis('off')
+    ax[1,2].title.set_text("Reconstruction Mean")
+    ax[1,3].imshow(reconstructive_map.detach().cpu().numpy()[2, 0, :, :, z], cmap='gray')
+    ax[1,3].axis('off')
+    ax[1,3].title.set_text("GroundTruth")
+    ax[1,4].imshow(results.detach().cpu().numpy()[2, 0, :, :, z], cmap='gray')
+    ax[1,4].axis('off')
+    ax[1,4].title.set_text("Result")
+    ax[1,5].imshow(np.where(results.detach().cpu().numpy() > 0.5, 1, 0)[2, 0, :, :, z], cmap='gray')
+    ax[1,5].axis('off')
+    ax[1,5].title.set_text("0.5")
     plt.tight_layout()
     plt.show()
     plt.close(fig)

@@ -10,7 +10,7 @@ from scipy import ndimage
 import pickle
 #from skimage.morphology import binary_opening
 from scipy.ndimage.morphology import binary_opening
-
+import main
 import config
 
 
@@ -34,27 +34,18 @@ def postprocessing_baseline(result, input, brainmask, name, mask):
     print("Save map: ", name)
     np.save(opj(config.results_path, 'map_') + name, map_mean)
 
-def postprocessing_voxel(result, input, brainmask, name, mask):
-    result /= result.max()
-    # L1 loss
-    map = np.subtract(input, result)
-    map_mean = np.mean(map, axis=0)
-    map_mean = np.absolute(map_mean)
-    # Brainmask !!! without CSF and with erosion !!!
-    map_mean[brainmask == 0] = 0
-
-    # Set to 0 for better visualization
-    #map_mean[map_mean < 0.2] = 0
+def postprocessing_reddisc(result, input, brainmask, name, mask):
+    map = result[0,...]
 
     # !!! NO CSF !!!
-    result_images(map_mean, name, mask, cmap="hot", note="hot")
-    result_images(map_mean, name, mask, cmap="gray", note="gray")
-    result_images(binary_opening(np.where(map_mean >= 0.5, 1, 0), structure=np.ones((3,3,3))).astype(int), name, mask, cmap="gray", note="opening")
+    result_images(map, name, mask, cmap="hot", note="hot")
+    result_images(map, name, mask, cmap="gray", note="gray")
+    result_images(np.where(map>0.5, 1, 0), name, mask, cmap="gray", note="BW")
 
     print("Save map: ", name)
-    np.save(opj(config.results_path, 'map_') + name, map_mean)
+    np.save(opj(config.results_path, 'map_') + name, map)
 
-def postprocessing_reddisc(result, input, brainmask, name, mask):
+def postprocessing_voxel(result, input, brainmask, name, mask):
     result /= result.max()
     # L1 loss
     map = np.subtract(input, result)
@@ -104,7 +95,7 @@ def result_images(map, name, mask, cmap, note):
         fig.savefig(path)
         plt.close(fig)
     else:
-        map = np.where(map >= 0.5, 1, 0)
+        #map = np.where(map >= 0.5, 1, 0)
         fig, ax1 = plt.subplots(1, 1, figsize=(20, 20))
         ax1.imshow(montage(map), cmap=cmap)
         path = opj(config.results_path, 'image_map_' + name + note + '.png')
@@ -176,7 +167,7 @@ def latentspace_analysis(space, brainmask, mask):
 
 
 # Hier sollen die gespeicherten Bilder aus dem Netzwerk aufgerufen werden und anschließend bis zur map verarbeitet + gespeichert werden
-def processing():
+def processing(*args):
     input_path = config.test
     mask_path = config.test_mask
     # !!! NO CSF !!!
@@ -256,8 +247,7 @@ def processing():
 
         if config.network == "VanillaVAE":
             postprocessing_baseline(output, input, brainmask, name, mask)
-        if config.network == "RecDisc":
+        if config.network == "RecDisc" or config.network == "RecDiscUnet":
             postprocessing_reddisc(output, input, brainmask, name, mask)
-
 
     return

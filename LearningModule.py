@@ -2,7 +2,7 @@
 import torch
 from pytorch_lightning.core.lightning import LightningModule
 from Models.VAE import VanillaVAE, SpatialVAE, VoxelVAE, CNNVoxelVAE
-from Models.RecDiscModel import RecDisc
+from Models.RecDiscModel import RecDisc, RecDiscUnet
 from torch import optim
 import numpy as np
 from os.path import join as opj
@@ -36,24 +36,28 @@ class LearningModule(LightningModule):
         elif config.network == "RecDisc":
             self.model = RecDisc(in_channels=64, in_channels_unet=64*2)
             self.params = config.rec_disc_params
+        elif config.network == "RecDiscUnet":
+            self.model = RecDiscUnet(in_channels=64, in_channels_unet=64*2)
+            self.params = config.rec_disc_params
         else:
             raise ValueError('You chose a network that is not available atm: '+config.network)
 
 
-    def forward(self, z):
-        y = self.model(z)
+    def forward(self, z, mask):
+        y = self.model(z, mask)
 
         return y
 
     def training_step(self, batch, batch_idx, optimizer_idx = 0):
         target = batch['target']
         input = batch['input']
+        mask = batch['mask_withoutCSF']
 
-        if config.network == "RecDisc":
-            results = self.forward(input)
+        if (config.network == "RecDisc") or (config.network == "RecDiscUnet"):
+            results = self.forward(input, mask)
             train_loss = self.model.loss_function(*results)
         else:
-            results = self.forward(input)
+            results = self.forward(input, mask)
             results.append(target)
             train_loss = self.model.loss_function(*results, M_N=self.params['kld_weight'])
 
@@ -64,13 +68,18 @@ class LearningModule(LightningModule):
     def validation_step(self, batch, batch_idx, optimizer_idx = 0):
         target = batch['target']
         input = batch['input']
+        mask = batch['mask_withoutCSF']
 
-        if config.network == "RecDisc":
-            results = self.forward(input)
+        if config.network == "RecDisc" or (config.network == "RecDiscUnet"):
+            results = self.forward(input, mask)
             val_loss = self.model.loss_function(*results)
-            show_RecDisc(input, results[5], results[2], results[0], results[3], results[6])
+            if config.network == "RecDisc" and ((self.trainer.current_epoch < 30) or ((self.trainer.current_epoch/10).is_integer())):
+                show_RecDisc(results[1], results[4], results[5], results[0], results[6], results[7])
+            if config.network == "RecDiscUnet" and ((self.trainer.current_epoch < 30) or ((self.trainer.current_epoch/10).is_integer())):
+                # [disc, reconstructive_map, z, x, anomaly_x, rec]
+                show_RecDisc(results[3], results[4], results[1], results[0], results[2], results[5])
         else:
-            results = self.forward(input)
+            results = self.forward(input, mask)
             results.append(target)
             val_loss = self.model.loss_function(*results, M_N=self.params['kld_weight'])
 
@@ -81,8 +90,10 @@ class LearningModule(LightningModule):
         #labels = batch['target']
         real_img = batch['input']
         id_list = batch['id']
+        mask = batch['mask_withoutCSF']
 
-        results = self.forward(real_img)
+        # The mask is not in use here atm.
+        results = self.forward(real_img, mask)
 
         if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
             coordinates_list = batch["coordinates"]
@@ -98,6 +109,7 @@ class LearningModule(LightningModule):
 
                 output = results[0][index, ...]
                 output_path = opj(config.results_path, 'output_')
+
                 np.save(output_path + name, output.cpu().detach().numpy())
 
                 if (config.network == "VanillaVAE") or (config.network == "SpatialVAE"):

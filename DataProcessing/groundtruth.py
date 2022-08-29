@@ -14,6 +14,7 @@ BraTS (Trainingsdata)
 
 Goal of this script:
 Prepare both datasets, so that the nnUNet can process them as training and testing data
+Train + test model
 (calculate the ground thruth for the UKA data)
 
 Important information:
@@ -315,18 +316,18 @@ def error_processing(image="vp3"):
 
 """
 ------------------------------------------
-# Call the pre-processing from NVIDIA
+# PREPROCESSING
 ------------------------------------------
 # Prepare data for dataloader
 # IMPORTANT: In folder-structure should only be the relevant nifti images (for example the T1 and FLAIR) -> Compare to BraTS-structure
 
-# Set True, if uka data should be prepared
+# Set global variable to True, if uka data should be prepared (otherwise nvidia data will be prepared)
 # uka_data = True
-
 prepare_data() 
 
 
 # Call further pre-pocessing from inside NVIDIA
+# IMPORTANT: Set datapath in nnUnet/preprocess.py
 
 os.system("python /work/scratch/ecke/nnUNet/preprocess.py --task 11 --ohe --exec_mode training")
 os.system("python /work/scratch/ecke/nnUNet/preprocess.py --task 12 --ohe --exec_mode test")
@@ -351,7 +352,11 @@ np.save("/work/scratch/ecke/Groundtruth_Data/test/XXX_meta.npy", test_meta)
 """
 
 
+
+
 """
+------------------------------------------
+# TRAINING
 ------------------------------------------
 # Call the training and Inference from NVIDIA (start here for new training and/or new testing)
 (Correct data is saved in specified folders)
@@ -367,9 +372,11 @@ main.py --gpus 1 --amp --save_preds --exec_mode predict --brats --data /work/scr
 """
 
 
+
+
 """
 ------------------------------------------
-# Call the post-processing from NVIDIA
+# POSTPROCESSING NVIDIA
 ------------------------------------------
 os.makedirs("/work/scratch/ecke/Groundtruth_Data/results/final_preds")
 preds = sorted(glob(f"/work/scratch/ecke/Groundtruth_Data/results/predictions_epochXXX"))
@@ -381,16 +388,22 @@ print("Finished!")
 """
 
 
+
+
 """
 ------------------------------------------
-# Visualization
+# VISUALIZATION
 ------------------------------------------
-from GroundTruth from data_visualization import mask_control
+from Data.Processing.data_visualization import mask_control
 mask_control()
 """
 
 
+
+
 """
+------------------------------------------
+# POSTPROCESSING dMRI
 ------------------------------------------
 # Postprocessing for diffusion MRI
 (Use the best segmentation map (dice score) and mark only voxels where two out of three runs detect a tumour.)
