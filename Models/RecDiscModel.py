@@ -1,111 +1,17 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-import numpy as np
-import random
-import matplotlib.pyplot as plt
-import config
-import raster_geometry as rg
-import warnings
-from typing import Optional
 
+from typing import Optional
+from DataProcessing.anomaly_generation import anomaly_generation
 from kornia.core import Tensor
 from kornia.testing import KORNIA_CHECK, KORNIA_CHECK_IS_TENSOR, KORNIA_CHECK_SHAPE
-from kornia.utils.one_hot import one_hot
 
+"""
 
-def anomaly_generation(input, mask):
+Two different RecDisc Models
 
-    # Generate anomaly block
-    input_anomaly = input
-    sign = [-1, 1][random.randrange(2)]
-    x, y, z = 32, 40, 32
-    random_size = random.randint(5, 10)
-    anomaly_block = torch.from_numpy(rg.sphere(2*random_size, random_size).astype(int))
-
-    # Isotropic
-    if random.uniform(0, 1) > 0.65:
-        anomaly_block = torch.mul(anomaly_block, random.uniform(0, 1))
-    # Random noise with centre value between 0.25 and 0.55
-    else:
-        gaussian_noise = np.random.normal(random.uniform(0.25, 0.55), 0.1, size=anomaly_block.shape)
-        anomaly_block = torch.mul(anomaly_block, torch.from_numpy(gaussian_noise))
-
-    # Place block in input-shaped array
-    block = torch.zeros_like(input)
-    random_x = sign * random.randint(4, 20) + x
-    random_y = sign * random.randint(4, 20) + y
-    random_z = sign * random.randint(4, 20) + z
-    block[:, :, random_x - random_size:random_x + random_size, random_y - random_size:random_y + random_size,
-    random_z - random_size:random_z + random_size] = anomaly_block
-
-    # Check if point of approximate centre is inside the brainmask (should be improved)
-    while not torch.equal(mask[:, random_x, random_y, random_z].cpu(), torch.ones(4)):
-        random_x = sign * random.randint(4, 20) + x
-        random_y = sign * random.randint(4, 20) + y
-        random_z = sign * random.randint(4, 20) + z
-
-        block = torch.zeros_like(input)
-        block[:, :, random_x - random_size:random_x + random_size, random_y - random_size:random_y + random_size,
-        random_z - random_size:random_z + random_size] = anomaly_block
-
-
-    # Make space for the block (zero all elements)
-    input_anomaly = torch.mul(input_anomaly, torch.where(block > 0, 0, 1))
-
-    # Add block to input, not for testdata
-    if config.mode == "test":
-        input = input
-    else:
-        input = torch.add(input_anomaly, block)
-
-    # Reconstruction map
-    reconstructive_map = torch.where(block[:, 0, :, :, :] != 0, 1, 0)
-    reconstructive_map = reconstructive_map[:, None, :, :, :]
-    #reconstructive_map_background = torch.where(block[:, 0, :, :, :] == 0, 1, 0)
-    #reconstructive_map = torch.cat((reconstructive_map_tumor[:, None, :, :, :], reconstructive_map_background[:, None, :, :, :]), dim=1)
-
-    return input, reconstructive_map, random_z
-
-def binary_focal_loss_with_logits(
-    input: Tensor,
-    target: Tensor,
-    alpha: float = 0.25,
-    gamma: float = 2.0,
-    reduction: str = 'none',
-    eps: Optional[float] = None,
-    pos_weight: Optional[Tensor] = None,
-) -> Tensor:
-
-    KORNIA_CHECK_SHAPE(input, ["B", "C", "*"])
-    KORNIA_CHECK(
-        input.shape[0] == target.shape[0],
-        f'Expected input batch_size ({input.shape[0]}) to match target batch_size ({target.shape[0]}).',
-    )
-
-    if pos_weight is None:
-        pos_weight = torch.ones(input.shape[-1], device=input.device, dtype=input.dtype)
-
-    KORNIA_CHECK_IS_TENSOR(pos_weight)
-    KORNIA_CHECK(input.shape[-1] == pos_weight.shape[0], "Expected pos_weight equals number of classes.")
-
-    probs_pos = input.sigmoid()
-    probs_neg = torch.sigmoid(-input)
-
-    loss_tmp = (
-        -alpha * pos_weight * probs_neg.pow(gamma) * target * input.sigmoid().log()
-        - (1 - alpha) * torch.pow(probs_pos, gamma) * (1.0 - target) * (-input).sigmoid().log()
-    )
-
-    if reduction == 'none':
-        loss = loss_tmp
-    elif reduction == 'mean':
-        loss = torch.mean(loss_tmp)
-    elif reduction == 'sum':
-        loss = torch.sum(loss_tmp)
-    else:
-        raise NotImplementedError(f"Invalid reduction mode: {reduction}")
-    return loss
+"""
 
 class RecDisc(nn.Module):
     def __init__(self, in_channels: int, in_channels_unet: int):
@@ -485,9 +391,51 @@ class RecDiscUnet(nn.Module):
         # Calculate reconstruction loss
         reconstruction_loss = F.mse_loss(input, reconstruction)
 
-        # Segmentation loss
-        discriminative_loss = F.l1_loss(discriminative_image, reconstructive_map)
+        # discriminative_loss = F.l1_loss(discriminative_image, reconstructive_map)
+        kwargs = {"alpha": 0.25, "gamma": 2.0, "reduction": 'mean'}
+        discriminative_loss = binary_focal_loss_with_logits(discriminative_image, reconstructive_map, **kwargs)
 
         loss = reconstruction_loss + discriminative_loss
 
         return {'loss': loss, 'Reconstruction_Loss': reconstruction_loss.detach(), 'Discriminative_Loss': discriminative_loss.detach()}
+
+
+def binary_focal_loss_with_logits(
+    input: Tensor,
+    target: Tensor,
+    alpha: float = 0.25,
+    gamma: float = 2.0,
+    reduction: str = 'none',
+    eps: Optional[float] = None,
+    pos_weight: Optional[Tensor] = None,
+) -> Tensor:
+
+    KORNIA_CHECK_SHAPE(input, ["B", "C", "*"])
+    KORNIA_CHECK(
+        input.shape[0] == target.shape[0],
+        f'Expected input batch_size ({input.shape[0]}) to match target batch_size ({target.shape[0]}).',
+    )
+
+    if pos_weight is None:
+        pos_weight = torch.ones(input.shape[-1], device=input.device, dtype=input.dtype)
+
+    KORNIA_CHECK_IS_TENSOR(pos_weight)
+    KORNIA_CHECK(input.shape[-1] == pos_weight.shape[0], "Expected pos_weight equals number of classes.")
+
+    probs_pos = input.sigmoid()
+    probs_neg = torch.sigmoid(-input)
+
+    loss_tmp = (
+        -alpha * pos_weight * probs_neg.pow(gamma) * target * input.sigmoid().log()
+        - (1 - alpha) * torch.pow(probs_pos, gamma) * (1.0 - target) * (-input).sigmoid().log()
+    )
+
+    if reduction == 'none':
+        loss = loss_tmp
+    elif reduction == 'mean':
+        loss = torch.mean(loss_tmp)
+    elif reduction == 'sum':
+        loss = torch.sum(loss_tmp)
+    else:
+        raise NotImplementedError(f"Invalid reduction mode: {reduction}")
+    return loss
