@@ -61,6 +61,7 @@ def main():
 
     # Automate testing after each run (remember: analysis is still extern and testing can also be run extern)
     where_is_checkpoint = callbacks.best_model_path
+    print(where_is_checkpoint)
     test_id = where_is_checkpoint.split("/")[-1]
     config.create_id(test_id)
 

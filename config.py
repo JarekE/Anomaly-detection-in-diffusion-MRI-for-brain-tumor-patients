@@ -12,18 +12,21 @@ parser.add_argument("-m", "--mode", default="train", help="Training mode of netw
 parser.add_argument("-t", "--test_this_model", default="CNNVoxelVAE-epoch=97-val_loss=1.51-max_epochs=100.ckpt", help="Name of model to be tested. Only usefull if mode is -test-.")
 parser.add_argument("-e", "--epochs", default=200, type=int, help="Number of epochs to train the model.")
 parser.add_argument("-n", "--network", default="CNNVoxelVAE", help="Name of Network: VanillaVAE, SpatialVAE, VoxelVAE or UNet.")
-parser.add_argument("-a", "--augmentation", default=False, type=bool, help="Augment the data by nonlinear transformations and inpaintings. Currently not availabe for VoxelVAE.")
 parser.add_argument("-l", "--latent_dim", default=64, type=int, help="Dimension of latent space, currently only available for VanillaVAE")
 parser.add_argument("-r", "--run", default=1, type=int, help="New parameter to train network with same parameter at the same time")
+parser.add_argument("-f", "--filter", default=16, type=int, help="Number of filters used in UNet for reconstruction.")
+parser.add_argument("-a", "--activation", default="None", help="Activationfunction of discriminiation network in RecDisc(Unet): None or Sigmoid")
+parser.add_argument("-an", "--anomaly", default="Iso", help="Choose anomaly: Iso, Gauss1, Gauss2, Mix.")
 args = vars(parser.parse_args())
 mode = args["mode"]
 test_this_model = args["test_this_model"]
 epochs = args["epochs"]
 network = args["network"]
-augmentation = args["augmentation"]
 latent_dim = args["latent_dim"]
 run = args["run"]
-
+rec_filter = args["filter"]
+ac_function = args["activation"]
+anomaly_setting = args["anomaly"]
 # For full images, we have only 28. 4 is a power of 2 and a divider of 28.
 if (network == "VoxelVAE"):
   batch_size = (48*64*64)
@@ -87,7 +90,7 @@ results_path = opj("/work/scratch/ecke/Masterarbeit/Results", test_this_model)
 data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model)
 
 if (network == "RecDisc") or (network == "RecDiscUnet"):
-  file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-run=' + str(run) + '-max_epochs=' + str(epochs)
+  file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-e=' + str(epochs) + '-f=' + str(rec_filter) + '-a=' + str(ac_function) + '-an=' + str(anomaly_setting)
 else:
   file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-run=' + str(run) + '-max_epochs=' + str(epochs) + '-latent_dim=' + str(latent_dim)
 
@@ -100,4 +103,6 @@ def create_id(test_id):
   results_path = opj("/work/scratch/ecke/Masterarbeit/Results", test_this_model)
   global data_drop_off
   data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model)
+  global mode
+  mode = "test"
   return

@@ -7,6 +7,7 @@ import random
 from scipy.special import comb
 import matplotlib.pyplot as plt
 from LearningModule import LearningModule
+from DataProcessing.anomaly_generation import anomaly_generation
 
 import config
 from config import uka_subjects
@@ -148,18 +149,25 @@ class UKADataset(Dataset):
 
             else:
                 patch = np.load(subject)
-                target = patch
+                target = patch.copy()
                 if self.type == "test":
                     mask_without_csf = np.load('/work/scratch/ecke/Masterarbeit/Data/Test/brainmask_withoutCSF'+ mask_id)
                 else:
                     mask_without_csf = np.load('/work/scratch/ecke/Masterarbeit/Data/Train/brainmask_withoutCSF'+ mask_id)
 
-                self.patches.append((patch, target, subject, mask_without_csf))
-
-                if (type != "test") and (config.augmentation == True):
-                    nonlinear_patch, inpainting_patch = data_augmentation(patch)
-                    self.patches.append((nonlinear_patch, target, subject))
-                    self.patches.append((inpainting_patch, target, subject))
+                # Anomaly generation
+                if (config.network == "RecDiscUnet") or (config.network == "RecDisc"):
+                    if self.type == "test":
+                        # This mask is not in use atm, but still necessary
+                        mask_without_csf = mask_without_csf[None, :, :, :]
+                        self.patches.append((patch, mask_without_csf, subject, 30, patch))
+                    else:
+                        for i in range(4):
+                            anomaly_x, reconstructive_map, z = anomaly_generation(patch, mask_without_csf)
+                            self.patches.append((anomaly_x, reconstructive_map, subject, z, patch))
+                        random.shuffle(self.patches)
+                else:
+                    self.patches.append((patch, target, subject))
 
     def __len__(self):
         return len(self.patches)
@@ -171,8 +179,13 @@ class UKADataset(Dataset):
                     "target": self.patches[idx][1],
                     "id": self.patches[idx][2],
                     "coordinates": self.patches[idx][3]}
-        else:
+        elif (config.network == "RecDiscUnet") or (config.network == "RecDisc"):
             return {"input": self.patches[idx][0],
                     "target": self.patches[idx][1],
                     "id": self.patches[idx][2],
-                    "mask_withoutCSF": self.patches[idx][3]}
+                    "print": self.patches[idx][3],
+                    "raw_input": self.patches[idx][4]}
+        else:
+            return {"input": self.patches[idx][0],
+                    "target": self.patches[idx][1],
+                    "id": self.patches[idx][2]}
