@@ -6,10 +6,9 @@ from Models.RecDiscModel import RecDisc, RecDiscUnet
 from torch import optim
 import numpy as np
 from os.path import join as opj
-from Models.UNet import UNet3d
-import pickle
+from Models.UNet import UNet3d 
 import config
-from DataProcessing.data_visualization import show_RecDisc
+from DataProcessing.data_visualization import show_RecDisc, z_space_visualization, z_space_analysis
 import matplotlib.pyplot as plt
 
 
@@ -29,7 +28,7 @@ class LearningModule(LightningModule):
             self.model = UNet3d(in_channels=64)
             self.params = config.unet_params
         elif config.network == "VoxelVAE":
-            self.model = VoxelVAE(in_channels=64)
+            self.model = VoxelVAE(in_channels=67, latent_dim=config.latent_dim)
             self.params = config.voxelvae_params
         elif config.network == "CNNVoxelVAE":
             self.model = CNNVoxelVAE(in_channels=64)
@@ -114,8 +113,23 @@ class LearningModule(LightningModule):
             if config.network == "RecDiscUnet" and ((self.trainer.current_epoch < 30) or ((self.trainer.current_epoch/50).is_integer())) and batch_idx == 0:
                 # input, input_anomaly, reconstructive_map, results, z, reconstruction
                 show_RecDisc(results[3], results[2], results[4], results[0], results[5], results[1])
-        else:
+        elif config.network == "VanillaVAE" or (config.network == "UNet"):
             results = self.forward(input)
+            results.append(target)
+            val_loss = self.model.loss_function(*results, M_N=self.params['kld_weight'])
+        else:
+            v_classes = batch['vector_class']
+            results = self.forward(input)
+
+            # Visualization
+            if config.latent_dim == 2:
+                if ((self.trainer.current_epoch/2).is_integer()) and batch_idx == 0:
+                    z_space_visualization(results[4].detach().cpu().numpy(), v_classes.detach().cpu().numpy())
+                    # Only for testing. function should be implemented in quantitative_analysis.py afterwards
+            # First analysis
+            if batch_idx == 0 or batch_idx == 1 or batch_idx == 3:
+                z_space_analysis(results[4].detach().cpu().numpy(), v_classes.detach().cpu().numpy())
+
             results.append(target)
             val_loss = self.model.loss_function(*results, M_N=self.params['kld_weight'])
 
@@ -123,39 +137,51 @@ class LearningModule(LightningModule):
         self.log_dict({f"val_{key}": val.item() for key, val in val_loss.items()}, sync_dist=True)
 
     def test_step(self, batch, batch_idx):
-        #labels = batch['target']
+
         real_img = batch['input']
         id_list = batch['id']
-        # mask = batch['mask_withoutCSF']
-        if batch_idx == 1:
-            fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(10, 5))
-            ax[0, 0].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 24], cmap='gray')
-            ax[0, 0].axis('off')
-            ax[0, 0].title.set_text("Input")
-            ax[0, 1].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 32], cmap='gray')
-            ax[0, 1].axis('off')
-            ax[0, 1].title.set_text("Input")
-            ax[1, 0].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 40], cmap='gray')
-            ax[1, 0].axis('off')
-            ax[1, 0].title.set_text("Input")
-            ax[1, 1].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 48], cmap='gray')
-            ax[1, 1].axis('off')
-            ax[1, 1].title.set_text("Input")
-            plt.tight_layout()
-            plt.show()
-            plt.close(fig)
 
         results = self.forward(real_img)
 
         if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
             coordinates_list = batch["coordinates"]
-            # Result Values, ID of each value, Coordinates of each value, mu of each value, logvar of each value
-            save_list = [results[0], id_list, coordinates_list, results[2], results[3]]
+            v_classes = batch['vector_class']
 
-            with open('logs/DataDropOff/batch_'+str(batch_idx), 'wb') as fp:
-                pickle.dump(save_list, fp)
+            # Visualization of latentspace
+            if config.latent_dim == 2:
+                z_space_visualization(results[4].detach().cpu().numpy(), v_classes.detach().cpu().numpy())
+            # Analysis (test)
+            z_space_analysis(results[4].detach().cpu().numpy(), v_classes.detach().cpu().numpy())
+
+            output_path = opj(config.results_path, 'output_')
+
+            ids = np.array(id_list)
+            coordinates = torch.stack((coordinates_list[0], coordinates_list[1], coordinates_list[2]), dim=1).cpu().detach().numpy()
+            z_space = results[4].cpu().detach().numpy()
+
+            np.save(output_path + "ids"+ str(batch_idx), ids)
+            np.save(output_path + "coordinates" + str(batch_idx), coordinates)
+            np.save(output_path + "z_space" + str(batch_idx), z_space)
 
         else:
+            if batch_idx == 1:
+                fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(10, 5))
+                ax[0, 0].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 24], cmap='gray')
+                ax[0, 0].axis('off')
+                ax[0, 0].title.set_text("Input")
+                ax[0, 1].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 32], cmap='gray')
+                ax[0, 1].axis('off')
+                ax[0, 1].title.set_text("Input")
+                ax[1, 0].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 40], cmap='gray')
+                ax[1, 0].axis('off')
+                ax[1, 0].title.set_text("Input")
+                ax[1, 1].imshow(real_img.detach().cpu().numpy()[2, 30, :, :, 48], cmap='gray')
+                ax[1, 1].axis('off')
+                ax[1, 1].title.set_text("Input")
+                plt.tight_layout()
+                plt.show()
+                plt.close(fig)
+
             for index, id in enumerate(id_list):
                 name = id.split("/")[-1]
 

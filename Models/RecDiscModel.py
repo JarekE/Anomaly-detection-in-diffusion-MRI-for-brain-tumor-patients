@@ -4,7 +4,7 @@ from torch.nn import functional as F
 from typing import Optional
 from kornia.core import Tensor
 from kornia.testing import KORNIA_CHECK, KORNIA_CHECK_IS_TENSOR, KORNIA_CHECK_SHAPE
-from config import rec_filter, ac_function
+from config import rec_filter, ac_function, ac_function_rec, loss_weight, positiv_weight, leaky_relu
 
 """
 
@@ -17,7 +17,10 @@ class RecDisc(nn.Module):
     def __init__(self, in_channels: int, in_channels_unet: int):
         super().__init__()
 
-        act_fn = nn.ReLU(inplace=True)
+        if leaky_relu == True:
+            act_fn = nn.LeakyReLU(inplace=True)
+        else:
+            act_fn = nn.ReLU(inplace=True)
 
         # Reconstruction Network
         self.in_dim_rec = in_channels
@@ -93,9 +96,14 @@ class RecDisc(nn.Module):
         return model
 
     def out_block_rec(self, in_dim, out_dim):
-        model = nn.Sequential(
-            nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0)
-            #nn.Sigmoid()
+        if ac_function_rec == "Sigmoid":
+            model = nn.Sequential(
+                nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
+                nn.Sigmoid()
+            )
+        else:
+            model = nn.Sequential(
+                nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
             )
         return model
 
@@ -178,9 +186,9 @@ class RecDisc(nn.Module):
         # discriminative_loss = F.l1_loss(discriminative_image, reconstructive_map)
         #kwargs = {"alpha": 0.25, "gamma": 2.0, "reduction": 'mean'}
         #discriminative_loss = binary_focal_loss_with_logits(discriminative_image, reconstructive_map, **kwargs)
-        discriminative_loss = F.binary_cross_entropy_with_logits(discriminative_image, reconstructive_map, pos_weight=torch.tensor(10.))
+        discriminative_loss = F.binary_cross_entropy_with_logits(discriminative_image, reconstructive_map, pos_weight=torch.tensor(positiv_weight))
 
-        loss = 5 * reconstruction_loss + discriminative_loss
+        loss = loss_weight * reconstruction_loss + discriminative_loss
 
         return {'loss': loss, 'RL': reconstruction_loss.detach(), 'DL': discriminative_loss.detach()}
 
@@ -197,7 +205,10 @@ class RecDiscUnet(nn.Module):
     def __init__(self, in_channels: int, in_channels_unet: int):
         super().__init__()
 
-        act_fn = nn.ReLU(inplace=True)
+        if leaky_relu == True:
+            act_fn = nn.LeakyReLU(inplace=True)
+        else:
+            act_fn = nn.ReLU(inplace=True)
 
         # Reconstruction Network
         self.in_dim_rec = in_channels
@@ -273,9 +284,14 @@ class RecDiscUnet(nn.Module):
         return model
 
     def out_block_rec(self, in_dim, out_dim):
-        model = nn.Sequential(
-            nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
-            nn.Sigmoid()
+        if ac_function_rec == "Sigmoid":
+            model = nn.Sequential(
+                nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
+                nn.Sigmoid()
+            )
+        else:
+            model = nn.Sequential(
+                nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
             )
         return model
 
@@ -361,9 +377,9 @@ class RecDiscUnet(nn.Module):
         # discriminative_loss = F.l1_loss(discriminative_image, reconstructive_map)
         #kwargs = {"alpha": 0.25, "gamma": 2.0, "reduction": 'mean'}
         #discriminative_loss = binary_focal_loss_with_logits(discriminative_image, reconstructive_map, **kwargs)
-        discriminative_loss = F.binary_cross_entropy_with_logits(discriminative_image, reconstructive_map, pos_weight=torch.tensor(10.))
+        discriminative_loss = F.binary_cross_entropy_with_logits(discriminative_image, reconstructive_map, pos_weight=torch.tensor(positiv_weight))
 
-        loss = 5 * reconstruction_loss + discriminative_loss
+        loss = loss_weight * reconstruction_loss + discriminative_loss
 
         return {'loss': loss, 'RL': reconstruction_loss.detach(), 'DL': discriminative_loss.detach()}
 

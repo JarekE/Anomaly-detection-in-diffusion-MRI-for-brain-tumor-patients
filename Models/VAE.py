@@ -6,7 +6,7 @@ from torch import nn
 from torch.nn import functional as F
 from config import Tensor
 from typing import List
-
+from config import ac_function_rec
 
 """
 
@@ -72,8 +72,8 @@ class VanillaVAE(BaseVAE):
             )
 
         self.decoder = nn.Sequential(*modules)
-
-        self.final_layer = nn.Sequential(
+        if ac_function_rec == "Sigmoid":
+            self.final_layer = nn.Sequential(
                             nn.ConvTranspose3d(hidden_dims[-1],
                                                hidden_dims[-1],
                                                kernel_size=3,
@@ -85,6 +85,18 @@ class VanillaVAE(BaseVAE):
                             nn.Conv3d(hidden_dims[-1], out_channels= 64,
                                       kernel_size= 3, padding= 1),
                             nn.Sigmoid())
+        else:
+            self.final_layer = nn.Sequential(
+                nn.ConvTranspose3d(hidden_dims[-1],
+                                   hidden_dims[-1],
+                                   kernel_size=3,
+                                   stride=2,
+                                   padding=1,
+                                   output_padding=1),
+                nn.BatchNorm3d(hidden_dims[-1]),
+                nn.LeakyReLU(),
+                nn.Conv3d(hidden_dims[-1], out_channels=64,
+                          kernel_size=3, padding=1))
 
 
 
@@ -294,28 +306,51 @@ class VoxelVAE(BaseVAE):
 
     def __init__(self,
                  in_channels: int,
-                 hidden_dims: List = None,
+                 latent_dim: int,
                  **kwargs) -> None:
         super(VoxelVAE, self).__init__()
 
+        out_features = in_channels
+        modules = []
+        if latent_dim is 2:
+            hidden_dims = [32, 16, 8, 4]
+        elif latent_dim is 4:
+            hidden_dims = [32, 16, 8]
+        elif latent_dim is 8:
+            hidden_dims = [32, 16]
+        else:
+            hidden_dims = [32]
+
         # encoder
-        self.encoder = nn.Sequential(nn.Linear(in_features=64, out_features=32),
-                                     nn.ReLU(),
-                                     nn.Linear(in_features=32, out_features=16),
-                                     nn.ReLU(),
-                                     )
+        for h_dim in hidden_dims:
+            modules.append(
+                nn.Sequential(
+                    nn.Linear(in_features=in_channels, out_features=h_dim),
+                    nn.ReLU())
+            )
+            in_channels = h_dim
+
+        self.encoder = nn.Sequential(*modules)
+
+        self.fc_mu = nn.Linear(hidden_dims[-1], latent_dim)
+        self.fc_var = nn.Linear(hidden_dims[-1], latent_dim)
+
+        modules = []
+        self.decoder_input = nn.Linear(latent_dim, hidden_dims[-1])
+        hidden_dims.reverse()
 
         # decoder
-        self.decoder = nn.Sequential(nn.Linear(in_features=16, out_features=32),
-                                     nn.ReLU(),
-                                     nn.Linear(in_features=32, out_features=64),
-                                     nn.Sigmoid(),
-                                     )
+        for i in range(len(hidden_dims) - 1):
+            modules.append(
+                nn.Sequential(
+                    nn.Linear(in_features=hidden_dims[i], out_features=hidden_dims[i + 1]),
+                    nn.ReLU())
+            )
 
-        self.fc_mu = nn.Linear(in_features=16, out_features=8)
-        self.fc_var = nn.Linear(in_features=16, out_features=8)
+        self.decoder = nn.Sequential(*modules)
 
-        self.decoder_input = nn.Linear(in_features=8, out_features=16)
+        self.final_layer = nn.Sequential(
+            nn.Linear(in_features=hidden_dims[-1], out_features=out_features))
 
 
     def encode(self, input: Tensor) -> List[Tensor]:
@@ -343,7 +378,9 @@ class VoxelVAE(BaseVAE):
     def forward(self, input: Tensor, **kwargs) -> List[Tensor]:
         mu, log_var = self.encode(input)
         z = self.reparameterize(mu, log_var)
-        return  [self.decode(z), input, mu, log_var]
+        z_decode = self.decode(z)
+
+        return  [self.final_layer(z_decode), input, mu, log_var, z]
 
     def loss_function(self,
                       *args,
@@ -353,7 +390,7 @@ class VoxelVAE(BaseVAE):
         #input = args[1]
         mu = args[2]
         log_var = args[3]
-        target = args[4]
+        target = args[5]
 
         kld_weight = kwargs['M_N'] # Account for the minibatch samples from the dataset
         recons_loss = F.mse_loss(recons, target)

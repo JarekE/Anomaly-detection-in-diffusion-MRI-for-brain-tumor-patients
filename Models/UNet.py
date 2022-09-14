@@ -1,12 +1,8 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from config import rec_filter, ac_function_rec
 
-"""
-
-To be deleted!!
-
-"""
 
 class UNet3d(nn.Module):
     def __init__(self,
@@ -15,8 +11,8 @@ class UNet3d(nn.Module):
 
         self.in_dim = in_channels
         self.out_dim = in_channels
-        self.num_filter = 16
-        act_fn = nn.ReLU(inplace=True)
+        self.num_filter = rec_filter
+        act_fn = nn.LeakyReLU(inplace=True)
 
         #%% UNet body
         self.down_1 = self.double_conv_block(self.in_dim, self.num_filter, act_fn)
@@ -63,9 +59,14 @@ class UNet3d(nn.Module):
         return model
 
     def out_block(self, in_dim, out_dim):
-        model = nn.Sequential(
-            nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
-            nn.Sigmoid()
+        if ac_function_rec == "Sigmoid":
+            model = nn.Sequential(
+                nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
+                nn.Sigmoid()
+            )
+        else:
+            model = nn.Sequential(
+                nn.Conv3d(in_dim, out_dim, kernel_size=1, stride=1, padding=0),
             )
         return model
 

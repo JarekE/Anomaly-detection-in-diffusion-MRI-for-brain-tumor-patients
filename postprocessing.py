@@ -175,7 +175,14 @@ def processing(*args):
     brainmask_path.sort()
     latentspace_size = 2
 
-    if (config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE"):
+    if ((config.network == "VoxelVAE") or (config.network == "CNNVoxelVAE")) and 1 == 2:
+        return
+        """
+        
+        Code can be used later for reconstruction. Diference: Just reconstruct and choose value by class. Delete afterwards. Everythings goes to other scripts.
+        
+        """
+
         # Load all the data
         output_path = glob(opj(config.data_drop_off, "batch*"))
         output_path.sort()
@@ -211,12 +218,12 @@ def processing(*args):
 
                 # Save voxel in image
                 voxel = loaded_batch[0][index]
-                mu = loaded_batch[3][index]
-                log_var = loaded_batch[4][index]
+                z = loaded_batch[3][index]
+                #log_var = loaded_batch[4][index]
                 locals()[voxel_id][:, voxel_x, voxel_y, voxel_z] = voxel.cpu()
-                locals()[voxel_id_latentspace][0:latentspace_size, voxel_x, voxel_y, voxel_z] = mu.cpu()
-                locals()[voxel_id_latentspace][latentspace_size:2 * latentspace_size, voxel_x, voxel_y,
-                voxel_z] = log_var.cpu()
+                locals()[voxel_id_latentspace][0:latentspace_size, voxel_x, voxel_y, voxel_z] = z.cpu()
+                #locals()[voxel_id_latentspace][latentspace_size:2 * latentspace_size, voxel_x, voxel_y,
+                #voxel_z] = log_var.cpu()
 
         for i in range(len(id_list)):
             input = np.load(input_path[i])
@@ -228,8 +235,8 @@ def processing(*args):
             np.save(opj(config.results_path, 'raw_output_') + name, np.float32(result))
 
             # Postprocessing of Approach 3
-            latentspace_analysis(latent_space, brainmask, mask)
-            postprocessing_voxel(result, input, brainmask, name, mask)
+            #latentspace_analysis(latent_space, brainmask, mask)
+            #postprocessing_voxel(result, input, brainmask, name, mask)
 
         return
 
@@ -245,7 +252,7 @@ def processing(*args):
         name = input_path[i].split("/")[-1]
         print(name)
 
-        if config.network == "VanillaVAE":
+        if config.network == "VanillaVAE" or config.network == "UNet":
             postprocessing_baseline(output, input, brainmask, name, mask)
         if config.network == "RecDisc" or config.network == "RecDiscUnet":
             postprocessing_reddisc(output, input, brainmask, name, mask)

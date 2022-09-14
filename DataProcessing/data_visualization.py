@@ -1,12 +1,16 @@
 # Idea: Load images, show them, save data-information for BraTS Pipeline
 
 import numpy as np
+import itertools
 import matplotlib.pyplot as plt
 import nibabel as nib
 import os
 from glob import glob
 from skimage.util import montage
 import shutil
+from sklearn.mixture import GaussianMixture
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import config
 
 def preview_images():
 
@@ -274,6 +278,81 @@ def show_RecDisc(input, input_anomaly, reconstructive_map, results, print_value,
     plt.show()
     plt.close(fig)
 
+    return
+
+def z_space_visualization(z_space, classes):
+    if z_space.shape[0] > 1000:
+        z_space = z_space[0:1000, :]
+        classes = classes[0:1000]
+
+    brain = z_space[classes == 0]
+    anomaly = z_space[classes == 1]
+
+    plt.scatter(brain[:, 0], brain[:, 1], c='b', label='Brain')
+    plt.scatter(anomaly[:, 0], anomaly[:, 1], c='r', label='Anomaly')
+    plt.ylabel('y')
+    plt.xlabel('x')
+    plt.legend()
+    plt.show()
+    plt.close()
+    return
+
+def plot_confusion_matrix(cm,
+                          target_names,
+                          title='Confusion matrix',
+                          cmap=None,
+                          normalize=True):
+
+    accuracy = np.trace(cm) / np.sum(cm).astype('float')
+    misclass = 1 - accuracy
+
+    if cmap is None:
+        cmap = plt.get_cmap('Blues')
+
+    plt.figure(figsize=(8, 6))
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+
+    if target_names is not None:
+        tick_marks = np.arange(len(target_names))
+        plt.xticks(tick_marks, target_names, rotation=45)
+        plt.yticks(tick_marks, target_names)
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+
+    thresh = cm.max() / 1.5 if normalize else cm.max() / 2
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        if normalize:
+            plt.text(j, i, "{:0.4f}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+        else:
+            plt.text(j, i, "{:,}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
+    plt.show()
+
+def z_space_analysis(z_space, classes):
+    gmm = GaussianMixture(n_components=2).fit(z_space)
+    gmm_labels = gmm.predict(z_space)
+
+    # Confusion matrix
+    cm = confusion_matrix(classes, gmm_labels)
+    plot_confusion_matrix(cm, ['Brain matter', 'Anomaly'], title='z-Space Confusion Matrix', cmap='summer', normalize=True)
+
+    # Plot in 2D (print only in 2D case)
+    if config.latent_dim == 2:
+        plt.scatter(z_space[:, 0], z_space[:, 1], c=gmm_labels, s=40, cmap='viridis')
+        plt.show()
+        plt.close()
     return
 
 #final_data_test()
