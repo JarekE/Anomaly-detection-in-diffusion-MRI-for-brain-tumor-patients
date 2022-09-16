@@ -17,7 +17,7 @@ class RecDisc(nn.Module):
     def __init__(self, in_channels: int, in_channels_unet: int):
         super().__init__()
 
-        if leaky_relu == True:
+        if leaky_relu == "True":
             act_fn = nn.LeakyReLU(inplace=True)
         else:
             act_fn = nn.ReLU(inplace=True)
@@ -205,7 +205,7 @@ class RecDiscUnet(nn.Module):
     def __init__(self, in_channels: int, in_channels_unet: int):
         super().__init__()
 
-        if leaky_relu == True:
+        if leaky_relu == "True":
             act_fn = nn.LeakyReLU(inplace=True)
         else:
             act_fn = nn.ReLU(inplace=True)

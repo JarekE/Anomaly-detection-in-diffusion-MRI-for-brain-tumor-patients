@@ -116,6 +116,24 @@ class LearningModule(LightningModule):
         elif config.network == "VanillaVAE" or (config.network == "UNet"):
             results = self.forward(input)
             results.append(target)
+
+            fig, ax = plt.subplots(nrows=1, ncols=4, figsize=(10, 5))
+            ax[0].imshow(input.detach().cpu().numpy()[1, 30, :, :, 40], cmap='gray')
+            ax[0].axis('off')
+            ax[0].title.set_text("Input")
+            ax[1].imshow(results[0].detach().cpu().numpy()[1, 30, :, :, 40], cmap='gray')
+            ax[1].axis('off')
+            ax[1].title.set_text("Out")
+            ax[2].imshow(np.mean(input.detach().cpu().numpy(), axis=1)[1, :, :, 40], cmap='gray')
+            ax[2].axis('off')
+            ax[2].title.set_text("Input Mean")
+            ax[3].imshow(np.mean(results[0].detach().cpu().numpy(), axis=1)[1, :, :, 40], cmap='gray')
+            ax[3].axis('off')
+            ax[3].title.set_text("Output Mean")
+            plt.tight_layout()
+            plt.show()
+            plt.close(fig)
+
             val_loss = self.model.loss_function(*results, M_N=self.params['kld_weight'])
         else:
             v_classes = batch['vector_class']
@@ -187,8 +205,12 @@ class LearningModule(LightningModule):
 
                 output = results[0][index, ...]
                 output_path = opj(config.results_path, 'output_')
-
                 np.save(output_path + name, output.cpu().detach().numpy())
+
+                if config.network == "RecDisc" or (config.network == "RecDiscUnet"):
+                    rec = results[1][index, ...]
+                    rec_path = opj(config.results_path, 'rec_')
+                    np.save(rec_path + name, rec.cpu().detach().numpy())
 
                 if (config.network == "VanillaVAE") or (config.network == "SpatialVAE"):
                     mu = results[2][index, ...]

@@ -21,7 +21,7 @@ parser.add_argument("-an", "--anomaly", default="Mix", help="Choose anomaly: Iso
 parser.add_argument("-lr", "--learningrate", default=0.0001, type=float, help="Number of filters used in UNet for reconstruction.")
 parser.add_argument("-pw", "--positivweight", default=10, type=int, help="Number of filters used in UNet for reconstruction.")
 parser.add_argument("-lw", "--lossweight", default=5, type=int, help="Number of filters used in UNet for reconstruction.")
-parser.add_argument("-leaky", "--leaky_relu", default=True, type=bool, help="Use of leakyrelu. Otherwise a normal ReLu Unit is used.")
+parser.add_argument("-leaky", "--leaky_relu", default="True", help="Use of leakyrelu. Otherwise a normal ReLu Unit is used.")
 
 args = vars(parser.parse_args())
 mode = args["mode"]
@@ -43,6 +43,8 @@ if (network == "VoxelVAE"):
   batch_size = int(80*64*64*0.2)
 elif (network == "CNNVoxelVAE"):
   batch_size = (64 * 64)
+elif (network == "UNet") and run == 15:
+  batch_size = 2
 else:
   batch_size = 4
 
@@ -72,7 +74,7 @@ cnnvoxelvae_params = {"LR": learning_rate,
 
 unet_params = {"LR": learning_rate,
   "weight_decay": 0.0,
-  "scheduler_gamma": None,
+  "scheduler_gamma": 0.95,
   "kld_weight": False}
 
 rec_disc_params = {"LR": learning_rate,
@@ -126,7 +128,7 @@ results_path = opj("/work/scratch/ecke/Masterarbeit/Results", test_this_model)
 data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model)
 
 if (network == "RecDisc") or (network == "RecDiscUnet"):
-  file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-lr=' + str(learning_rate) + '-pw=' + str(positiv_weight) + '-lw=' + str(loss_weight)
+  file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-f=' + str(rec_filter) + '-ar=' + str(ac_function_rec) + '-a=' + str(ac_function) + '-leaky=' + str(leaky_relu)
 elif (network == "VanillaVAE"):
   file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-ldim=' + str(latent_dim) + '-ar=' + str(ac_function_rec)
 elif (network == "UNet"):
