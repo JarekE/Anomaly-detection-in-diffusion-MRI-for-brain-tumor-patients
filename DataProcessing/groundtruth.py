@@ -9,13 +9,13 @@ vpX, 35 subjects, T1/FLAIR, (232, 256, 176)
 /images/Diffusion_Imaging/uka_gliom/ma_ecke/vp{t}/{m}.nii.gz
 
 BraTS (Trainingsdata)
-1251 subjects, not continous, T1/FLAIR (not the other!), (240, 240, 155)
+1251 subjects, not continuous, T1/FLAIR (not the other!), (240, 240, 155)
 /images/PublicDataset/brats/RSNA_ASNR_MICCAI_BraTS2021_TrainingData
 
 Goal of this script:
 Prepare both datasets, so that the nnUNet can process them as training and testing data
 Train + test model
-(calculate the ground thruth for the UKA data)
+(calculate the ground truth for the UKA data)
 
 Important information:
 the nnUNet project from NVIDIA is necessary for this script.
@@ -410,6 +410,6 @@ mask_control()
 (Simple will result in smoother masks)
 ------------------------------------------
 post_processing("simple")
-# Use this function to save a mask from uka as a NVIDIA-sytle mask (paths from raw uka data and NVIDIA masks)
+# Use this function to save a mask from uka as a NVIDIA-style mask (paths from raw uka data and NVIDIA masks)
 error_processing("vp27")
 """

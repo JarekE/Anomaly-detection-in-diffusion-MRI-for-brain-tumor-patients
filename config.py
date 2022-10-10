@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 # Arguments
 parser = ArgumentParser()
 parser.add_argument("-m", "--mode", default="train", help="Training mode of network (train or test)")
-parser.add_argument("-t", "--test_this_model", default="CNNVoxelVAE-epoch=97-val_loss=1.51-max_epochs=100.ckpt", help="Name of model to be tested. Only usefull if mode is -test-.")
+parser.add_argument("-t", "--test_this_model", default="RecDisc-epoch=107-val_loss=0.11-r=4-an=Mix-d=Half.ckpt", help="Name of model to be tested. Only usefull if mode is -test-.")
 parser.add_argument("-e", "--epochs", default=250, type=int, help="Number of epochs to train the model.")
 parser.add_argument("-n", "--network", default="RecDisc", help="Name of Network: VanillaVAE, SpatialVAE, VoxelVAE or UNet.")
 parser.add_argument("-l", "--latent_dim", default=2, type=int, help="Dimension of latent space, currently only available for VanillaVAE and VoxelVAE")
@@ -17,11 +17,13 @@ parser.add_argument("-r", "--run", default=8, type=int, help="New parameter to t
 parser.add_argument("-f", "--filter", default=128, type=int, help="Number of filters used in UNet for reconstruction.")
 parser.add_argument("-a", "--activation", default="None", help="Activationfunction of discriminiation network in RecDisc(Unet): None or Sigmoid")
 parser.add_argument("-ar", "--activation_rec", default="None", help="Activationfunction of reconstruction network in RecDisc(Unet): None or Sigmoid")
-parser.add_argument("-an", "--anomaly", default="Mix", help="Choose anomaly: Iso, Gauss1, Gauss2, Mix.")
-parser.add_argument("-lr", "--learningrate", default=0.0001, type=float, help="Number of filters used in UNet for reconstruction.")
-parser.add_argument("-pw", "--positivweight", default=10, type=int, help="Number of filters used in UNet for reconstruction.")
+parser.add_argument("-lr", "--learningrate", default=0.001, type=float, help="Number of filters used in UNet for reconstruction.")
+parser.add_argument("-pw", "--positivweight", default=20, type=int, help="Number of filters used in UNet for reconstruction.")
 parser.add_argument("-lw", "--lossweight", default=5, type=int, help="Number of filters used in UNet for reconstruction.")
-parser.add_argument("-leaky", "--leaky_relu", default="True", help="Use of leakyrelu. Otherwise a normal ReLu Unit is used.")
+parser.add_argument("-leaky", "--leaky_relu", default="False", help="Use of leakyrelu. Otherwise a normal ReLu Unit is used.")
+
+parser.add_argument("-an", "--anomaly", default="Mix", help="Choose anomaly: Iso, Normal1, Gauss1, Normal2, Gauss2, Mix.")
+parser.add_argument("-d", "--distribution", default="Full", help="Center of anomaly distribution is half the center of brain matter distribution if not set to Full.")
 
 args = vars(parser.parse_args())
 mode = args["mode"]
@@ -34,6 +36,7 @@ rec_filter = args["filter"]
 ac_function = args["activation"]
 ac_function_rec = args["activation_rec"]
 anomaly_setting = args["anomaly"]
+anomaly_distribution = args["distribution"]
 learning_rate = args["learningrate"]
 positiv_weight = args["positivweight"]
 loss_weight = args["lossweight"]
@@ -125,10 +128,14 @@ log_dir = "/work/scratch/ecke/Masterarbeit/logs/Callback"
 log_dir_logger = "/work/scratch/ecke/Masterarbeit/logs/Logger"
 save_path = opj("/work/scratch/ecke/Masterarbeit/logs/Callback", test_this_model)
 results_path = opj("/work/scratch/ecke/Masterarbeit/Results", test_this_model)
-data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model)
+data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model) 
 
+anomaly_testing = True
 if (network == "RecDisc") or (network == "RecDiscUnet"):
-  file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-f=' + str(rec_filter) + '-ar=' + str(ac_function_rec) + '-a=' + str(ac_function) + '-leaky=' + str(leaky_relu)
+  if anomaly_testing == True:
+      file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-an=' + str(anomaly_setting) + '-d=' + str(anomaly_distribution)
+  else:
+    file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-f=' + str(rec_filter) + '-ar=' + str(ac_function_rec) + '-a=' + str(ac_function) + '-leaky=' + str(leaky_relu)
 elif (network == "VanillaVAE"):
   file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run) + '-ldim=' + str(latent_dim) + '-ar=' + str(ac_function_rec)
 elif (network == "UNet"):

@@ -1,4 +1,4 @@
-# This file should process my data+masks.
+# This file should process data+masks.
 # Goal: numpy files in Data/Train or /Test with cropped and "diffusion"-processed data ready for my networks!
 
 import numpy as np

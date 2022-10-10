@@ -11,6 +11,7 @@ import shutil
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import config
+from os.path import join as opj
 
 def preview_images():
 
@@ -207,7 +208,7 @@ def final_data_test():
         test_mask[test_mask == 0] = np.nan
         ax1.imshow(montage(test_mask), vmin=0, vmax=4, alpha=1)
         path = os.path.join(dir, example_id.replace(".npy","") + '_overlay.png')
-        fig.savefig(path)
+        #fig.savefig(path)
         plt.close(fig)
 
 
@@ -355,6 +356,37 @@ def z_space_analysis(z_space, classes):
         plt.close()
     return
 
+
+def show_histogram():
+    DATA_PATH = '/work/scratch/ecke/Masterarbeit/Data/Train'
+    data_list = glob(opj(DATA_PATH, "vp*"))
+    data_list_mask = glob(opj(DATA_PATH, "brainmask_withoutCSF*"))
+    data_list.sort()
+    data_list_mask.sort()
+    all_elements = []
+
+    for i in range(len(data_list)):
+        data = np.load(data_list[i])
+        mask = np.load(data_list_mask[i])
+        data = np.where(mask == 1, data, 0)
+        all_elements.append(data)
+
+    histo_data = np.vstack(all_elements).flatten()
+    histo_data = histo_data[histo_data > 0.0]
+    plt.hist(histo_data, bins=100, density=True)
+    plt.legend()
+    plt.show()
+
+    print("Mean: ", np.mean(histo_data))
+    print("SD: ", np.std(histo_data))
+
+    print("Mean for second approach: ", np.mean(histo_data)/2)
+    print("SD for second approach: ", np.std(histo_data))
+
+    return
+
+
+#show_histogram()
 #final_data_test()
 #final_data_train()
 #tumor_diffspace_control()
@@ -362,16 +394,34 @@ def z_space_analysis(z_space, classes):
 """
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
 
-test = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/maskvp1.npy")
-test_brainmask = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/brainmask_withoutCSFvp1.npy")
+test_image = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/vp10.npy")
+test_mask = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/brainmask_withoutCSFvp10.npy")
+
+test_image = np.flip(np.flip(np.swapaxes(test_image, 1, 3), axis=1), axis=2)
+test_mask = np.flip(np.flip(np.swapaxes(test_mask, 0, 2), axis=0), axis=1)
 
 b = 35
-ax[0].imshow(test[:, :, b], cmap='gray') 
+ax[0].imshow(test_image[40, b, :, :], cmap='gray')
 ax[0].axis('off')
-ax[1].imshow(test_brainmask[:, :, b], cmap='gray')
+ax[1].imshow(test_mask[b, :, :], cmap='gray')
 ax[1].axis('off')
 plt.tight_layout()
 plt.show()
 #fig.savefig('test.png', dpi=fig.dpi)
 plt.close(fig)
+
+
+
+plt.imshow(patch[40, :, :, z], cmap='gray')
+                            plt.axis('off')
+                            plt.show()
+                            plt.close()
+                            plt.imshow(anomaly_x[40, :, :, z], cmap='gray')
+                            plt.axis('off')
+                            plt.show()
+                            plt.close()
+                            plt.imshow(reconstructive_map[0, :, :, z], cmap='gray')
+                            plt.axis('off')
+                            plt.show()
+                            plt.close()
 """

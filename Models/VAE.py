@@ -83,7 +83,7 @@ class VanillaVAE(BaseVAE):
                             nn.BatchNorm3d(hidden_dims[-1]),
                             nn.LeakyReLU(),
                             nn.Conv3d(hidden_dims[-1], out_channels= 64,
-                                      kernel_size= 3, padding= 1),
+                                      kernel_size= 1, padding=0),
                             nn.Sigmoid())
         else:
             self.final_layer = nn.Sequential(
@@ -96,7 +96,7 @@ class VanillaVAE(BaseVAE):
                 nn.BatchNorm3d(hidden_dims[-1]),
                 nn.LeakyReLU(),
                 nn.Conv3d(hidden_dims[-1], out_channels=64,
-                          kernel_size=3, padding=1))
+                          kernel_size=1, padding=0))
 
 
 

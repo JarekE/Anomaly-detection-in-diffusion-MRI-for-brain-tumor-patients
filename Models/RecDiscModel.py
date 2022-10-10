@@ -196,7 +196,7 @@ class RecDisc(nn.Module):
 """
 
 NEW CLASS
-Uses Unets in both tasks
+Uses Unets in both tasks 
 
 """
 

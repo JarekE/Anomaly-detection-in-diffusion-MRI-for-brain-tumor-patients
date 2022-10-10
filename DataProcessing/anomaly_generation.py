@@ -1,6 +1,6 @@
 import random
 import matplotlib.pyplot as plt
-from config import anomaly_setting
+from config import anomaly_setting, anomaly_distribution
 import raster_geometry as rg
 import numpy as np
 
@@ -27,47 +27,77 @@ def anomaly_generation(input_data, mask):
         z_sign = [-1, 1][random.randrange(2)]
 
         # Size and shape of anomaly
-        random_size = random.randint(7, 11)
+        random_size = random.randint(5, 11)
         #anomaly_block = rg.sphere(2 * random_size, random_size).astype(int)
         anomaly_block = rg.ellipsoid(2 * random_size, (random_size * random.uniform(0.5, 1), random_size * random.uniform(0.5, 1), random_size * random.uniform(0.5, 1)))
         channels = [anomaly_block for _ in range(64)]
         anomaly_block = np.stack(channels, axis=0)
 
-        high_value = 0.3
+        # Define values for anomalies
+        mean = 0.4
+        if anomaly_distribution != "Full":
+            mean = 0.2
+        sd = 0.12
+        min = mean - sd
+        max = mean + sd
 
         if anomaly_setting == "Iso":
             # Isotropic
-            anomaly_block = np.multiply(anomaly_block, random.uniform(0.1, high_value))
+            anomaly_block = np.multiply(anomaly_block, random.uniform(min, max))
+        elif anomaly_setting == "Normal1":
+            # Random noise with centre value between 0.1 and 0.3
+            noise = np.random.uniform(min, max, size=anomaly_block.shape)
+            anomaly_block = np.multiply(anomaly_block, noise)
         elif anomaly_setting == "Gauss1":
             # Random noise with centre value between 0.1 and 0.3
-            gaussian_noise = np.random.normal(random.uniform(0.1, high_value), 0.1, size=anomaly_block.shape)
+            gaussian_noise = np.random.normal(mean, sd, size=anomaly_block.shape)
             anomaly_block = np.multiply(anomaly_block, gaussian_noise)
+        elif anomaly_setting == "Normal2":
+            # Random vector in channel dimension asigned to each voxel of tumor (Equal for all voxel per channel)
+            random_vector = np.random.uniform(min, max, size=64)
+            for i in range(3):
+                channels = [random_vector for _ in range(2*random_size)]
+                random_vector = np.stack(channels, axis=1)
+            anomaly_block = np.multiply(anomaly_block, random_vector)
         elif anomaly_setting == "Gauss2":
             # Random vector in channel dimension asigned to each voxel of tumor (Equal for all voxel per channel)
-            random_vector = (np.random.rand(64) * high_value)
+            random_vector = np.random.normal(mean, sd, size=64)
             for i in range(3):
                 channels = [random_vector for _ in range(2*random_size)]
                 random_vector = np.stack(channels, axis=1)
             anomaly_block = np.multiply(anomaly_block, random_vector)
         else:
             random_value2 = random.uniform(0, 1)
+            random_value3 = random.uniform(0, 1)
             if random_value2 > 0.66:
-                anomaly_block = np.multiply(anomaly_block, random.uniform(0.1, high_value))
+                anomaly_block = np.multiply(anomaly_block, random.uniform(min, max))
             elif random_value2 < 0.33:
-                gaussian_noise = np.random.normal(random.uniform(0.1, high_value), 0.1, size=anomaly_block.shape)
-                anomaly_block = np.multiply(anomaly_block, gaussian_noise)
+                if random_value3 > 0.5:
+                    noise = np.random.uniform(min, max, size=anomaly_block.shape)
+                    anomaly_block = np.multiply(anomaly_block, noise)
+                else:
+                    gaussian_noise = np.random.normal(mean, sd, size=anomaly_block.shape)
+                    anomaly_block = np.multiply(anomaly_block, gaussian_noise)
             else:
-                random_vector = (np.random.rand(64) * high_value)
-                for i in range(3):
-                    channels = [random_vector for _ in range(2 * random_size)]
-                    random_vector = np.stack(channels, axis=1)
-                anomaly_block = np.multiply(anomaly_block, random_vector)
+                if random_value3 > 0.5:
+                    random_vector = (np.random.uniform(min, max, size=64))
+                    for i in range(3):
+                        channels = [random_vector for _ in range(2 * random_size)]
+                        random_vector = np.stack(channels, axis=1)
+                    anomaly_block = np.multiply(anomaly_block, random_vector)
+                else:
+                    random_vector = (np.random.normal(mean, sd, size=64))
+                    for i in range(3):
+                        channels = [random_vector for _ in range(2 * random_size)]
+                        random_vector = np.stack(channels, axis=1)
+                    anomaly_block = np.multiply(anomaly_block, random_vector)
 
         # Place block in input-shaped array
         random_x = x_sign * random.randint(4, 20) + x
         random_y = y_sign * random.randint(4, 20) + y
         random_z = z_sign * random.randint(4, 20) + z
 
+        # Make sure centre points of block are inside the brain matter
         while not (mask[random_x, random_y, random_z].item() == 1.0 and mask[
             random_x + 1, random_y + 1, random_z + 1].item() == 1.0):
             random_x = x_sign * random.randint(4, 20) + x

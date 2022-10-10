@@ -40,7 +40,7 @@ class LearningModule(LightningModule):
             self.model = RecDiscUnet(in_channels=64, in_channels_unet=64*2)
             self.params = config.rec_disc_params
         else:
-            raise ValueError('You chose a network that is not available atm: '+config.network)
+            raise ValueError('You chose a network that is not available at the moment.: '+config.network)
 
 
     def forward(self, input):
@@ -207,7 +207,7 @@ class LearningModule(LightningModule):
                 output_path = opj(config.results_path, 'output_')
                 np.save(output_path + name, output.cpu().detach().numpy())
 
-                if config.network == "RecDisc" or (config.network == "RecDiscUnet"):
+                if (config.network == "RecDisc") or (config.network == "RecDiscUnet"):
                     rec = results[1][index, ...]
                     rec_path = opj(config.results_path, 'rec_')
                     np.save(rec_path + name, rec.cpu().detach().numpy())
@@ -224,7 +224,7 @@ class LearningModule(LightningModule):
     def on_test_epoch_end(self):
         pass
 
-    def configure_optimizers(self):
+    def configure_optimizers(self): 
         optims = []
         scheds = []
 

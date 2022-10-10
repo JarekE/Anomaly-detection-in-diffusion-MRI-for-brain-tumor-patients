@@ -3,16 +3,25 @@ from glob import glob
 from os.path import join as opj
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import roc_curve, f1_score, roc_auc_score, accuracy_score
+from sklearn.metrics import roc_curve, f1_score, roc_auc_score, accuracy_score, precision_recall_curve
 from operator import itemgetter
 import statistics
 import pandas as pd
 from scipy.ndimage.morphology import binary_opening
+from skimage import filters
+import skimage.measure
 
 
-# All necessary paths and information
+"""
+
+QUANTITATIVE RESULTS
+
+"""
+
 DATA_PATH = '/work/scratch/ecke/Masterarbeit/Data/Test'
 
+choose_threshold = "OptimalF1" # "Unsupervised" # "OptimalAUC" # "OptimalF1" # "Otsu # MeanPool
+choose_network = "RecDiscNet" #RecDiscNet #Results_DAE
 
 def calculate_metrics(threshold, mask, map, opening):
 
@@ -27,18 +36,48 @@ def calculate_metrics(threshold, mask, map, opening):
 def roc(map, brainmask_NoCSF, tumormask):
     # Change tumor mask (target) to a binary mask
     tumormask[tumormask > 0] = 1
-
-    # Unsupervised threshold!
-    unsupervised_threshold = 0.5
-
-    # Choose only values in the WM section
     map = np.where(brainmask_NoCSF == 1, map, 0)
-    map_opening = binary_opening(np.where(map >= unsupervised_threshold, 1, 0), structure=np.ones((3, 3, 3)))
     tumormask = np.where(brainmask_NoCSF == 1, tumormask, 0)
+
+    # Thresholds!
+    if choose_threshold == "Unsupervised":
+        unsupervised_threshold = 0.5
+        optimal_threshold = unsupervised_threshold
+    elif choose_threshold == "MeanPool":
+        pool_map = skimage.measure.block_reduce(map, (5, 5, 5), np.mean)
+        unsupervised_threshold = np.max(pool_map)
+        optimal_threshold = unsupervised_threshold
+    elif choose_threshold == "Otsu":
+        flatten_otsu = map.flatten()
+        otsu_threshold = filters.threshold_otsu(flatten_otsu[flatten_otsu != 0])
+        unsupervised_threshold = otsu_threshold
+        optimal_threshold = otsu_threshold
+    elif choose_threshold == "OptimalAUC":
+        # Youden's J statistic
+        flatten_opauc = map.flatten()
+        tumormask_flatten_opauc = tumormask.flatten()
+        tumormask_flatten_opauc = tumormask_flatten_opauc[flatten_opauc != 0]
+        flatten_opauc = flatten_opauc[flatten_opauc != 0]
+        fpr, tpr, thresholds = roc_curve(tumormask_flatten_opauc, flatten_opauc)
+        unsupervised_threshold = optimal_threshold = thresholds[np.argmax(tpr - fpr)]
+    elif choose_threshold == "OptimalF1":
+        # Precision Recall curve
+        flatten_opf1 = map.flatten()
+        tumormask_flatten_opf1 = tumormask.flatten()
+        tumormask_flatten_opf1 = tumormask_flatten_opf1[flatten_opf1 != 0]
+        flatten_opf1 = flatten_opf1[flatten_opf1 != 0]
+        precision, recall, thresholds = precision_recall_curve(tumormask_flatten_opf1, flatten_opf1)
+        unsupervised_threshold = optimal_threshold = thresholds[np.argmax(np.nan_to_num((2 * precision * recall) / (precision + recall)))]
+    else:
+        raise NameError('This threshold type is not supported.')
+
+    # Choose only brain matter
+    map_opening = binary_opening(np.where(map >= unsupervised_threshold, 1, 0), structure=np.ones((3, 3, 3)))
     map_flatten = map.flatten()
     tumormask_flatten = tumormask.flatten()
     map_opening_flatten = map_opening.flatten()
 
+    # Delete background and CSF for evaluation
     tumormask_flatten = tumormask_flatten[map_flatten != 0]
     map_opening_flatten = map_opening_flatten[map_flatten != 0]
     map_flatten = map_flatten[map_flatten != 0]
@@ -46,10 +85,6 @@ def roc(map, brainmask_NoCSF, tumormask):
     # ROC AUC
     auc = roc_auc_score(tumormask_flatten, map_flatten)
     fpr, tpr, threshold = roc_curve(tumormask_flatten, map_flatten)
-
-    # Find optimal threshold (this is not undsupervised, therefore not used to produce quantitative results)
-    optimal_idx = np.argmax(tpr - fpr)
-    optimal_threshold = threshold[optimal_idx]
 
     # Metrics
     f1, acc, f1_opening, acc_opening = calculate_metrics(unsupervised_threshold, tumormask_flatten, map_flatten, map_opening_flatten)
@@ -62,7 +97,7 @@ def roc(map, brainmask_NoCSF, tumormask):
     return f1, auc, fpr, tpr, acc, optimal_threshold, f1_opening, acc_opening
 
 
-def print_curve(list):
+def print_curve(list, analysis_results):
     #marker = ["v", "^", "<", ">", "8", "s", "p", "*", ".", "D"]
     for i in range(len(list)):
         print('Model' + str(list[i][7]) + ': ROC AUC=%.3f' % (list[i][1]))
@@ -141,15 +176,15 @@ def quantitative_analysis(result_list):
             para3 = network
         # RedDisc and RedDiscUnet
         else:
-            para1 = item[item.find('XXX=') + len('XXX='):item.rfind('-XXX')]
-            para2 = item[item.find('XXX=') + len('XXX='):item.rfind('-XXX')]
-            para3 = item[item.find('XXX=') + len('XXX='):item.rfind('.ckpt')]
-            if para3.endswith('-v1'):
-                para3 = para3[:-3]
+            para1 = item[item.find('an=') + len('an='):item.rfind('-d')]
+            para2 = item[item.find('d=') + len('d='):item.rfind('.ckpt')]
+            if para2.endswith('-v1'):
+                para2 = para2[:-3]
+            para3 = network
 
         for i in range(len(map_list)):
             map = np.load(map_list[i])
-            if network == "VanillaVAE" and para2 == "None":
+            if network == "VanillaVAE" and para2 == "None" and choose_threshold == "Unsupervised":
                 map = normalize(map)
             histo_list.append(map)
             brainmask_NoCSF = np.load(brainmask_NoCSF_list[i])
@@ -165,13 +200,14 @@ def quantitative_analysis(result_list):
             acc_opening_list.append(acc_opening)
 
         # Show Histogram
-        histo_data = np.vstack(histo_list).flatten()
-        all_elements = len(histo_data)
-        histo_data = histo_data[histo_data > 0.1]
-        percentage_elements = len(histo_data)/all_elements*100
-        plt.hist(histo_data, label='Model_'+para3+'_perc_'+str(int(percentage_elements)), bins = 30, density=True)
-        plt.legend()
-        plt.show()
+        if 0:
+            histo_data = np.vstack(histo_list).flatten()
+            all_elements = len(histo_data)
+            #histo_data = histo_data[histo_data > 0.1]
+            percentage_elements = len(histo_data)/all_elements*100
+            plt.hist(histo_data, label='Model_'+para3+'_perc_'+str(int(percentage_elements)), bins = 30, density=True)
+            plt.legend()
+            plt.show()
 
         # Averaging
         f1_average = mean(f1_list)
@@ -195,69 +231,138 @@ def quantitative_analysis(result_list):
 
     return list
 
-# ---------------------------------------------------------------------------------------------------------- #
+def test_run9():
+    if choose_network == "RecDiscNet":
+        analysis_results = "/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies"
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run 750e+64f (inc. some Rec)", "*"))
+        list_run1 = quantitative_analysis(result_list)
+        list_run1 = sorted(list_run1, key=itemgetter(7))
+        df_1 = pd.DataFrame(list_run1)
+        #df_1.to_csv(opj(analysis_results, 'raw_data_9.csv'), index=False, header=False)
 
-"""
+        # average
+        average_list = average_results(list_run1, list_run1, list_run1, list_run1, list_run1, list_run1, list_run1,
+                                       number=7)
+        # sorted from worst to best
+        list = sorted(average_list, key=itemgetter(1))
+        #print_curve(list[0:1] + list[-1:], analysis_results)
+        # Save to excel
+        df = pd.DataFrame(list)
+        df.to_csv(opj(analysis_results, 'quantitative_analysis_averaged.csv'), index=False, header=False)
+    return
 
-Add all results to compare
-!!! Check, that only the desired runs are chosen by the result_list !!!
----> Check the path and that both paths contain the same datasets
+def call_analysis():
+    if choose_network == "Results_DAE":
+        analysis_results = "/work/scratch/ecke/Masterarbeit/Results_DAE/Results"
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run1", "*"))
+        list_run1 = quantitative_analysis(result_list)
+        list_run1 = sorted(list_run1, key=itemgetter(7))
+        df_1 = pd.DataFrame(list_run1)
+        df_1.to_csv(opj(analysis_results, 'raw_data1.csv'), index=False, header=False)
 
-+ Where to save the analysis_results?
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run2", "*"))
+        list_run2 = quantitative_analysis(result_list)
+        list_run2 = sorted(list_run2, key=itemgetter(7))
+        df_2 = pd.DataFrame(list_run2)
+        df_2.to_csv(opj(analysis_results, 'raw_data2.csv'), index=False, header=False)
 
-"""
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run3", "*"))
+        list_run3 = quantitative_analysis(result_list)
+        list_run3 = sorted(list_run3, key=itemgetter(7))
+        df_3 = pd.DataFrame(list_run3)
+        df_3.to_csv(opj(analysis_results, 'raw_data3.csv'), index=False, header=False)
 
-analysis_results = "/work/scratch/ecke/Masterarbeit/Results_DAE/Results"
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run4", "*"))
+        list_run4 = quantitative_analysis(result_list)
+        list_run4 = sorted(list_run4, key=itemgetter(7))
+        df_4 = pd.DataFrame(list_run4)
+        df_4.to_csv(opj(analysis_results, 'raw_data4.csv'), index=False, header=False)
 
-result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run1", "*"))
-list_run1 = quantitative_analysis(result_list)
-list_run1 = sorted(list_run1, key=itemgetter(7))
-df_1 = pd.DataFrame(list_run1)
-df_1.to_csv(opj(analysis_results, 'raw_data1.csv'), index=False, header=False)
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run5", "*"))
+        list_run5 = quantitative_analysis(result_list)
+        list_run5 = sorted(list_run5, key=itemgetter(7))
+        df_5 = pd.DataFrame(list_run5)
+        df_5.to_csv(opj(analysis_results, 'raw_data5.csv'), index=False, header=False)
 
-result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run2", "*"))
-list_run2 = quantitative_analysis(result_list)
-list_run2 = sorted(list_run2, key=itemgetter(7))
-df_2 = pd.DataFrame(list_run2)
-df_2.to_csv(opj(analysis_results, 'raw_data2.csv'), index=False, header=False)
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run6", "*"))
+        list_run6 = quantitative_analysis(result_list)
+        list_run6 = sorted(list_run6, key=itemgetter(7))
+        df_6 = pd.DataFrame(list_run6)
+        df_6.to_csv(opj(analysis_results, 'raw_data6.csv'), index=False, header=False)
 
-result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run3", "*"))
-list_run3 = quantitative_analysis(result_list)
-list_run3 = sorted(list_run3, key=itemgetter(7))
-df_3 = pd.DataFrame(list_run3)
-df_3.to_csv(opj(analysis_results, 'raw_data3.csv'), index=False, header=False)
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run7", "*"))
+        list_run7 = quantitative_analysis(result_list)
+        list_run7 = sorted(list_run7, key=itemgetter(7))
+        df_7 = pd.DataFrame(list_run7)
+        df_7.to_csv(opj(analysis_results, 'raw_data7.csv'), index=False, header=False)
 
-result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run4", "*"))
-list_run4 = quantitative_analysis(result_list)
-list_run4 = sorted(list_run4, key=itemgetter(7))
-df_4 = pd.DataFrame(list_run4)
-df_4.to_csv(opj(analysis_results, 'raw_data4.csv'), index=False, header=False)
+        # ---------------------------------------------------------------------------------------------------------- #
 
-result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run5", "*"))
-list_run5 = quantitative_analysis(result_list)
-list_run5 = sorted(list_run5, key=itemgetter(7))
-df_5 = pd.DataFrame(list_run5)
-df_5.to_csv(opj(analysis_results, 'raw_data5.csv'), index=False, header=False)
+        # average
+        average_list = average_results(list_run1, list_run2, list_run3, list_run4, list_run5, list_run6, list_run7, number = 7)
+        # sorted from worst to best
+        list = sorted(average_list, key=itemgetter(1))
+        print_curve(list[0:1]+list[-1:], analysis_results)
+        # Save to excel
+        df = pd.DataFrame(list)
+        df.to_csv(opj(analysis_results, 'quantitative_analysis_averaged.csv'), index=False, header=False)
+    elif choose_network == "RecDiscNet":
+        analysis_results = "/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies"
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run1", "*"))
+        list_run1 = quantitative_analysis(result_list)
+        list_run1 = sorted(list_run1, key=itemgetter(7))
+        df_1 = pd.DataFrame(list_run1)
+        df_1.to_csv(opj(analysis_results, 'raw_data1.csv'), index=False, header=False)
 
-result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run6", "*"))
-list_run6 = quantitative_analysis(result_list)
-list_run6 = sorted(list_run6, key=itemgetter(7))
-df_6 = pd.DataFrame(list_run6)
-df_6.to_csv(opj(analysis_results, 'raw_data6.csv'), index=False, header=False)
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run2", "*"))
+        list_run2 = quantitative_analysis(result_list)
+        list_run2 = sorted(list_run2, key=itemgetter(7))
+        df_2 = pd.DataFrame(list_run2)
+        df_2.to_csv(opj(analysis_results, 'raw_data2.csv'), index=False, header=False)
 
-result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run7", "*"))
-list_run7 = quantitative_analysis(result_list)
-list_run7 = sorted(list_run7, key=itemgetter(7))
-df_7 = pd.DataFrame(list_run7)
-df_7.to_csv(opj(analysis_results, 'raw_data7.csv'), index=False, header=False)
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run3", "*"))
+        list_run3 = quantitative_analysis(result_list)
+        list_run3 = sorted(list_run3, key=itemgetter(7))
+        df_3 = pd.DataFrame(list_run3)
+        df_3.to_csv(opj(analysis_results, 'raw_data3.csv'), index=False, header=False)
 
-# ---------------------------------------------------------------------------------------------------------- #
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run4", "*"))
+        list_run4 = quantitative_analysis(result_list)
+        list_run4 = sorted(list_run4, key=itemgetter(7))
+        df_4 = pd.DataFrame(list_run4)
+        df_4.to_csv(opj(analysis_results, 'raw_data4.csv'), index=False, header=False)
 
-# average
-average_list = average_results(list_run1, list_run2, list_run3, list_run4, list_run5, list_run6, list_run7, number = 7)
-# sorted from worst to best
-list = sorted(average_list, key=itemgetter(1))
-print_curve(list[0:1]+list[-1:])
-# Save to excel
-df = pd.DataFrame(list)
-df.to_csv(opj(analysis_results, 'quantitative_analysis_averaged.csv'), index=False, header=False)
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run5", "*"))
+        list_run5 = quantitative_analysis(result_list)
+        list_run5 = sorted(list_run5, key=itemgetter(7))
+        df_5 = pd.DataFrame(list_run5)
+        df_5.to_csv(opj(analysis_results, 'raw_data5.csv'), index=False, header=False)
+
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run6 (inc. Rec)", "*"))
+        list_run6 = quantitative_analysis(result_list)
+        list_run6 = sorted(list_run6, key=itemgetter(7))
+        df_6 = pd.DataFrame(list_run6)
+        df_6.to_csv(opj(analysis_results, 'raw_data6.csv'), index=False, header=False)
+
+        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run7", "*"))
+        list_run7 = quantitative_analysis(result_list)
+        list_run7 = sorted(list_run7, key=itemgetter(7))
+        df_7 = pd.DataFrame(list_run7)
+        df_7.to_csv(opj(analysis_results, 'raw_data7.csv'), index=False, header=False)
+
+        # ---------------------------------------------------------------------------------------------------------- #
+
+        # average
+        average_list = average_results(list_run1, list_run2, list_run3, list_run4, list_run5, list_run6, list_run7,
+                                       number=7)
+        # sorted from worst to best
+        list = sorted(average_list, key=itemgetter(1))
+        print_curve(list[0:1] + list[-1:], analysis_results)
+        # Save to excel
+        df = pd.DataFrame(list)
+        df.to_csv(opj(analysis_results, 'quantitative_analysis_averaged.csv'), index=False, header=False)
+    else:
+        raise NameError('This network is not supported.')
+
+#call_analysis()
+test_run9()
