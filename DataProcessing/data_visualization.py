@@ -3,6 +3,7 @@
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
+import matplotlib
 import nibabel as nib
 import os
 from glob import glob
@@ -12,6 +13,11 @@ from sklearn.mixture import GaussianMixture
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import config
 from os.path import join as opj
+import pandas as pd
+import math
+import scipy.stats as stats
+import os
+from fnmatch import fnmatch
 
 def preview_images():
 
@@ -370,20 +376,118 @@ def show_histogram():
         mask = np.load(data_list_mask[i])
         data = np.where(mask == 1, data, 0)
         all_elements.append(data)
+        print(i)
 
     histo_data = np.vstack(all_elements).flatten()
     histo_data = histo_data[histo_data > 0.0]
-    plt.hist(histo_data, bins=100, density=True)
-    plt.legend()
+    mean = np.mean(histo_data)
+    sd = np.std(histo_data)
+    mu = mean/2
+    sigma = sd
+
+    matplotlib.rcParams.update({'font.size': 25})
+    plt.figure(figsize=(14, 7))  # Make it 14x7 inch
+    plt.style.use('seaborn-whitegrid')  # nice and clean grid
+    plt.hist(histo_data, bins=90, facecolor='#2ab0ff', edgecolor='#169acf', linewidth=0.5, density = True, zorder = 0, label = "Histogram")
+    plt.title('Half of Mean Normal Distribution', fontsize=50)
+    plt.xlabel('Value', fontsize=30)
+    plt.ylabel('Density', fontsize=30)
+
+    if 0:
+        # Gleichverteilung
+        x_normal = np.linspace(mean - sd, mean + sd, 100)
+        y_normal = np.full(100, 1 / (2*sd))
+        plt.plot(x_normal, y_normal, color='navy', zorder=1, label = "Anomaly")
+        plt.fill_between(x_normal, y_normal, alpha=0.5, color='navy', zorder=1)
+    if 1:
+        # Gauß
+        x = np.linspace(0, mu + 3 * sigma, 100)
+        plt.plot(x, stats.norm.pdf(x, mu, sigma), color='navy', label = "Anomaly")
+        plt.fill_between(x, stats.norm.pdf(x, mu, sigma), alpha=0.5, color='navy')
+
+    plt.legend(fontsize=30, loc = "upper right")
+    plt.savefig("half_mean_normal.png")
     plt.show()
 
-    print("Mean: ", np.mean(histo_data))
-    print("SD: ", np.std(histo_data))
-
-    print("Mean for second approach: ", np.mean(histo_data)/2)
-    print("SD for second approach: ", np.std(histo_data))
-
+    print("Mean: ", mean)
+    print("SD: ", sd)
+    print("Mean for second approach: ", mean/2)
+    print("SD for second approach: ", sd)
     return
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+def output_histogram(network, activation, name):
+    DATA_PATH = '/work/scratch/ecke/Masterarbeit/Data/Test'
+    root = '/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/'
+    subdirs = ['Run4', 'Run3', 'Run2', 'Run1', 'Run7', 'Run5', 'Run6 (inc. Rec)']
+    list = []
+    data_list = []
+
+    for dir in subdirs:
+        run = sorted(glob(opj(root, dir, '*'+network, "map*")))
+        list.append(run)
+
+    for i in range(len(list[0])):
+        data = np.zeros((64,80,64))
+        for j in range(len(list)):
+            map = np.load(list[j][i])
+            map = sigmoid(map)
+            data = data + map
+        data = data / len(list)
+        data_list.append(data)
+
+    data_list_brainmask = sorted(glob(opj(DATA_PATH, "brainmask_withoutCSF*")))
+    data_list_mask = sorted(glob(opj(DATA_PATH, "mask*")))
+    all_anomalies = []
+    all_matter = []
+
+    for i in range(len(data_list)):
+        data = data_list[i]
+        mask = np.load(data_list_mask[i])
+        brainmask = np.load(data_list_brainmask[i])
+
+        anomaly = np.where(mask == 1, data, 0)
+        # Brainmatter without anomaly
+        brainmatter = np.where(brainmask == 1, data, 0)
+        brainmatter = np.where(mask == 1, 0, brainmatter)
+
+        all_anomalies.append(anomaly)
+        all_matter.append(brainmatter)
+        print(i)
+
+    histo_anomaly = np.vstack(all_anomalies).flatten()
+    histo_anomaly = histo_anomaly[histo_anomaly != 0.0]
+
+    histo_matter = np.vstack(all_matter).flatten()
+    histo_matter = histo_matter[histo_matter != 0.0]
+
+    matplotlib.rcParams.update({'font.size': 25})
+    plt.figure(figsize=(14, 7))  # Make it 14x7 inch
+    plt.style.use('seaborn-whitegrid')  # nice and clean grid
+    plt.hist(histo_matter, bins=90, facecolor='#2ab0ff', edgecolor='#169acf', linewidth=0.5, density=True, zorder=0,
+             label="Brain Matter", range=(0,1))
+    plt.hist(histo_anomaly, bins=90, color='navy', linewidth=0.5, density=True, zorder=1, alpha = 0.5,
+             label="Anomaly", range=(0,1))
+    plt.title(name+' '+activation+' Mean Distribution', fontsize=50)
+    plt.xlabel('Residual', fontsize=30)
+    plt.ylabel('Density', fontsize=30)
+
+    plt.legend(fontsize=30, loc="upper right")
+    plt.savefig("residual_histogram_"+name+activation+".png")
+    plt.show()
+    return
+
+
+#output_histogram(network = 'an=Normal1-d=Half.ckpt', activation="Half", name="Uniform Random")
+
+
+
+
+
+
+
 
 
 #show_histogram()
