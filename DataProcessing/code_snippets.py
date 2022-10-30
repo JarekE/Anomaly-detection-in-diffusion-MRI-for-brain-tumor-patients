@@ -1,5 +1,3 @@
-# Load names of results and use them as excel sheet
-
 import pandas as pd
 from glob import glob
 from os.path import join as opj
@@ -10,7 +8,15 @@ import statistics
 from statistics import mean
 import matplotlib.pyplot as plt
 
-# Results to Excel
+#####################################
+#
+#
+# Code snippets for further processing or an insight of data
+#
+#
+#####################################
+
+# Save results in an excel file
 def results_to_excel():
     load_run = "/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Architecture/Run10"
     load_list = glob(opj(load_run, "*"))
@@ -31,6 +37,7 @@ def results_to_excel():
     df.to_csv(opj(load_run, 'run.csv'), index=False, header=True)
     return
 
+# Get a first insight into the final data
 def first_insight():
     load = "/work/scratch/ecke/Masterarbeit/Results/RecDisc-epoch=203-val_loss=0.15-r=1-an=Mix-d=Half.ckpt"
     DATA_PATH = '/work/scratch/ecke/Masterarbeit/Data/Test'
@@ -94,131 +101,3 @@ def first_insight():
     plt.ylabel('True Positive Rate')
     plt.legend()
     plt.show()
-
-def logs_for_training(mode = "RecDisc"):
-
-    if mode == "DAE":
-        load_logs = "/work/scratch/ecke/Masterarbeit/Results_DAE/Logs/LogsForTrainingVanVAE"
-        load_list = glob(opj(load_logs, "*"))
-        color_list = ['b', 'g', 'y', 'r', 'c']
-        epochs_number = range(1, 501)
-        loss = np.zeros(500)
-
-        for i, excel in enumerate(load_list):
-            epochs = pd.read_csv(opj(load_logs, excel)).val_loss.dropna().to_numpy()
-            plt.plot(epochs_number, epochs, color_list[i], label=i)
-            print(epochs.shape)
-            loss = np.add(loss, epochs)
-
-        plt.title('Check VanVAE loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.show()
-
-        mean_loss = loss / len(load_list)
-
-        load_logs = "/work/scratch/ecke/Masterarbeit/Results_DAE/Logs/LogsForTrainingUNET"
-        load_list = glob(opj(load_logs, "*"))
-        loss = np.zeros(500)
-
-        for i, excel in enumerate(load_list):
-            epochs = pd.read_csv(opj(load_logs, excel)).val_loss.dropna().to_numpy()
-            plt.plot(epochs_number, epochs, color_list[i], label=i)
-            print(epochs.shape)
-            loss = np.add(loss, epochs)
-
-        plt.title('Check U-Net loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.show()
-
-        mean_loss_2 = loss / len(load_list)
-        plt.rcParams["figure.figsize"] = (10, 4)
-        plt.plot(epochs_number, mean_loss, 'navy', label='VanVAE Loss')
-        plt.plot(epochs_number, mean_loss_2, 'royalblue', label='U-Net Loss')
-        plt.title('Mean Validation Loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.savefig('DAE_loss.pdf')
-        plt.show()
-
-        mean_loss = mean_loss[0:50]
-        mean_loss_2 = mean_loss_2[0:50]
-        epochs_number = range(1, 51)
-        plt.rcParams["figure.figsize"] = (10, 4)
-        plt.plot(epochs_number, mean_loss, 'navy', label='VanVAE Loss')
-        plt.plot(epochs_number, mean_loss_2, 'royalblue', label='U-Net Loss')
-        plt.title('Mean Validation Loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.savefig('DAE_loss_zoomed.pdf')
-        plt.show()
-    else:
-        load_logs = "/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/LogsForTraining"
-        load_list = glob(opj(load_logs, "*"))
-        loss = np.zeros(250)
-        loss_1 = np.zeros(250)
-        loss_2 = np.zeros(250)
-        epochs_number = range(1, 251)
-
-        for i, excel in enumerate(load_list):
-            val_loss = pd.read_csv(opj(load_logs, excel)).val_loss.dropna().to_numpy()
-            val_DL_loss = pd.read_csv(opj(load_logs, excel)).val_DL.dropna().to_numpy()
-            val_RL_loss = pd.read_csv(opj(load_logs, excel)).val_RL.dropna().to_numpy()
-
-            #plt.plot(epochs_number, val_loss, 'b', label="Loss "+str(i))
-            #plt.plot(epochs_number, val_DL_loss, 'r', label="DL Loss "+str(i))
-            #plt.plot(epochs_number, val_RL_loss,'y', label="RL Loss "+str(i))
-
-            print(val_loss.shape, val_DL_loss.shape, val_RL_loss.shape)
-            loss = np.add(loss, val_loss)
-            DL_loss = np.add(loss_1, val_DL_loss)
-            RL_loss = np.add(loss_2, val_RL_loss)
-
-        if 0:
-            plt.title('Check U-Net loss')
-            plt.ylim([0, 0.2])
-            plt.xlabel('Epochs')
-            plt.ylabel('Loss')
-            plt.legend()
-            plt.show()
-
-        mean_loss = loss / len(load_list)
-        mean_loss_DL = DL_loss / len(load_list)
-        mean_loss_RL = RL_loss / len(load_list)
-
-        #plt.style.use('seaborn-whitegrid')
-        plt.rcParams["figure.figsize"] = (10, 4)
-        plt.plot(epochs_number, mean_loss, 'navy', label='Loss')
-        plt.plot(epochs_number, mean_loss_DL, 'royalblue', label='Discrimination Loss')
-        plt.plot(epochs_number, mean_loss_RL, 'cornflowerblue', label='Reconstruction Loss')
-        plt.title('Mean Validation Loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.savefig('RecDiscNet_loss.pdf')
-        plt.show()
-
-        mean_loss = mean_loss[0:50]
-        mean_loss_DL = mean_loss_DL[0:50]
-        mean_loss_RL = mean_loss_RL[0:50]
-        epochs_number = range(1, 51)
-
-        plt.rcParams["figure.figsize"] = (10, 4)
-        plt.plot(epochs_number, mean_loss, 'navy', label='Loss')
-        plt.plot(epochs_number, mean_loss_DL, 'royalblue', label='Discrimination Loss')
-        plt.plot(epochs_number, mean_loss_RL, 'cornflowerblue', label='Reconstruction Loss')
-        plt.title('Mean Validation Loss')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.savefig('RecDiscNet_loss_zoomed.pdf')
-        plt.show()
-
-    return
-
-logs_for_training()

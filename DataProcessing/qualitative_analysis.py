@@ -1,14 +1,3 @@
-"""
-
-Idea:
-Load specific images and print a qualitative output.
-Images (good, bad) can be evaluated firstly by looking at normal postprocessing output.
-
-Save images in folder for quantitative analysis of the regarding approach.
-
-!Choose data and name of images for each run separately!
-
-"""
 import numpy as np
 from scipy.ndimage.morphology import binary_opening
 import matplotlib.pyplot as plt
@@ -17,13 +6,20 @@ import skimage.measure
 from sklearn.metrics import roc_curve,  precision_recall_curve
 from skimage import filters
 
+#####################################
+#
+#
+# Plot qualitative results for the final output data of the models
+#
+#
+#####################################
 
+# Used for RecDiscNet output
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
+# Print array of images as used in thesis (decide for path and network)
 def best_results_images():
-    # ----------------------------------------------------------------
-    # Decide!
     image_data = ["/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run4/VanillaVAE-epoch=373-val_loss=0.02-r=4-ldim=128-ar=Sigmoid.ckpt",
                   "/work/scratch/ecke/Masterarbeit/Results_DAE/Results/Run4/UNet-epoch=222-val_loss=0.16-r=4-ar=Sigmoid-f=16.ckpt"]
     RecDiscNet = False
@@ -35,12 +31,11 @@ def best_results_images():
 
     # Get this dataset
     dataset = ['31', '2', '30']
-    #dataset = ['1', '2', '4', '5', '6', '7']
+    # Get this slide
     slide = [24, 22, 28]
     best_thresholds = ['Dice', 'Youden']
     name_of_image = 'example_VanVAE7_dice_UNet5_youdens_supervised.png'
 
-    # ----------------------------------------------------------------
     for s in range(len(image_data)):
         for i in range(len(dataset)):
             input_list[s].append(np.flip(np.flip(
@@ -99,7 +94,6 @@ def best_results_images():
                     else:
                         print("Not implemented yet")
 
-
             output_threshold_list[s].append(np.where(output_list[s][i] >= threshold_list[s][0], 1, 0))
             output_MO_list[s].append(binary_opening(np.where(output_list[s][i] >= threshold_list[s][1], 1, 0), structure=np.ones((3, 3, 3))))
             mask_list[s][i][mask_list[s][i] == 0] = np.nan
@@ -144,20 +138,17 @@ def best_results_images():
     plt.close(fig)
     return
 
+# Single image of choice (decide path, dataset and slide)
 def qualitative_images():
-    # ----------------------------------------------------------------
-    # Decide!
     image_data = "/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run4/RecDisc-epoch=244-val_loss=0.12-r=4-an=Mix-d=Half.ckpt"
     single = False
     RecDiscNet = True
     analysis_results = "/work/scratch/ecke/Masterarbeit/"
     input_list, mask_list, output_list, brainmask_edited_list, brainmask_list, output_03_list, output_MO_list = [], [], [], [], [], [], []
 
-    # Get this dataset
     dataset = ['1', '6']
     slide = [16, 40, 13, 32]
 
-    # ----------------------------------------------------------------
     for i in range(len(dataset)):
         input_list.append(np.flip(np.flip(np.swapaxes(np.mean(np.load("/work/scratch/ecke/Masterarbeit/Data/Test/vp"+dataset[i]+".npy"), axis=0), 0, 2), axis=0), axis=1))
         mask_list.append(np.flip(np.flip(np.swapaxes(np.load("/work/scratch/ecke/Masterarbeit/Data/Test/maskvp"+dataset[i]+".npy"), 0, 2), axis=0), axis=1))
@@ -251,7 +242,3 @@ def qualitative_images():
         plt.show()
         plt.close(fig)
     return
-
-
-
-best_results_images()

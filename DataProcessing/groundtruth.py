@@ -1,31 +1,4 @@
-# GroundTruth pipeline
-
-"""
-Header: Deep Learning segmentation of T1 / FLAIR images for dMRI ground truth maps of tumors
-
-Data:
-UKA (Testdata)
-vpX, 35 subjects, T1/FLAIR, (232, 256, 176)
-/images/Diffusion_Imaging/uka_gliom/ma_ecke/vp{t}/{m}.nii.gz
-
-BraTS (Trainingsdata)
-1251 subjects, not continuous, T1/FLAIR (not the other!), (240, 240, 155)
-/images/PublicDataset/brats/RSNA_ASNR_MICCAI_BraTS2021_TrainingData
-
-Goal of this script:
-Prepare both datasets, so that the nnUNet can process them as training and testing data
-Train + test model
-(calculate the ground truth for the UKA data)
-
-Important information:
-the nnUNet project from NVIDIA is necessary for this script.
-https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Segmentation/nnUNet/notebooks/BraTS21.ipynb
-"""
-
 import json
-import os
-from glob import glob
-from subprocess import call
 import nibabel
 from joblib import Parallel, delayed
 import shutil
@@ -36,16 +9,32 @@ from subprocess import call
 import nibabel as nib
 import numpy as np
 from scipy.ndimage.measurements import label
-import matplotlib.pyplot as plt
+from os.path import join as opj
 
+########################################
+# Deep Learning segmentation of T1 / FLAIR images for dMRI ground truth maps of tumors
+#
+# Data:
+# UKA (Testdata)
+# vpX, 35 subjects, T1/FLAIR, (232, 256, 176)
+# /images/Diffusion_Imaging/uka_gliom/ma_ecke/vp{t}/{m}.nii.gz
+#
+# BraTS (Trainingsdata)
+# 1251 subjects, not continuous, T1/FLAIR (not the other!), (240, 240, 155)
+# /images/PublicDataset/brats/RSNA_ASNR_MICCAI_BraTS2021_TrainingData
+#
+# Goal of this script:
+# Prepare both datasets, so that the nnUNet can process them as training and testing data
+# --> calculate the ground truth for the UKA data
+#
+#Important information:
+#the nnUNet project from NVIDIA is necessary for this script.
+#https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/Segmentation/nnUNet/notebooks/BraTS21.ipynb
+########################################
 
-# Location of the datasets. Important: The data is not there anymore. Please safe your own datasets.
-# brats: .../BraTS*/... (all 1251 subjects)
-# uka: .../vp*/... (only the tumor subjects)
+# Location of the datasets
 brats_loc = "/images/PublicDataset/brats/RSNA_ASNR_MICCAI_BraTS2021_TrainingData"
 uka_loc = "/work/scratch/ecke/ma_ecke"
-uka_data = False
-
 
 def load_nifty(directory, example_id, suffix):
     if uka_data:
@@ -53,13 +42,11 @@ def load_nifty(directory, example_id, suffix):
     else:
         return nibabel.load(os.path.join(directory, example_id + "_" + suffix + ".nii.gz"))
 
-
 def load_channels(d, example_id):
     if uka_data:
         return [load_nifty(d, example_id, data_type) for data_type in ["t2_flair_masked", "t1_skullstripped"]]
     else:
         return [load_nifty(d, example_id, suffix) for suffix in ["flair", "t1", "t1ce", "t2"]]
-
 
 def get_data(nifty, dtype="int16"):
     if dtype == "int16":
@@ -67,7 +54,6 @@ def get_data(nifty, dtype="int16"):
         data[data == -32768] = 0
         return data
     return nifty.get_fdata().astype(np.uint8)
-
 
 def prepare_nifty(d):
     example_id = d.split("/")[-1]
@@ -91,7 +77,6 @@ def prepare_nifty(d):
         vol[vol == 4] = 3
         seg = nibabel.nifti1.Nifti1Image(vol, affine, header=header)
         nibabel.save(seg, os.path.join(d, example_id + "_seg.nii.gz"))
-
 
 def prepare_dirs(data, train):
     img_path, lbl_path = os.path.join(data, "images"), os.path.join(data, "labels")
@@ -126,7 +111,6 @@ def prepare_dirs(data, train):
                         call(f"mv {f} {img_path}", shell=True)
             call(f"rm -rf {d}", shell=True)
 
-
 def prepare_dataset_json(data, train):
     images, labels = glob(os.path.join(data, "images", "*")), glob(os.path.join(data, "labels", "*"))
     images = sorted([img.replace(data + "/", "") for img in images])
@@ -152,10 +136,8 @@ def prepare_dataset_json(data, train):
     with open(os.path.join(data, "dataset.json"), "w") as outfile:
         json.dump(dataset, outfile)
 
-
 def run_parallel(func, args):
     return Parallel(n_jobs=os.cpu_count())(delayed(func)(arg) for arg in args)
-
 
 def prepare_dataset(data, train):
     print(f"Preparing Dataset from: {data}")
@@ -166,16 +148,12 @@ def prepare_dataset(data, train):
     prepare_dirs(data, train)
     prepare_dataset_json(data, train)
 
-
 def prepare_data():
     if uka_data:
-        # Testdata
         prepare_dataset(uka_loc, False)
     else:
-        # Trainsdata
         prepare_dataset(brats_loc, True)
     print("Finished!")
-
 
 def process_data(d):
     example_id = d.split("/")[-1]
@@ -196,7 +174,6 @@ def process_data(d):
             image = np.delete(image, 2, axis=0)
         np.save(os.path.join("/work/scratch/ecke/Groundtruth_Data/train", example_id), image)
 
-
 def save_data(data="uka"):
     if data == "uka":
         path = "/work/scratch/ecke/ma_ecke/12_3d/test"
@@ -204,7 +181,6 @@ def save_data(data="uka"):
     else:
         path = "/images/PublicDataset/brats/RSNA_ASNR_MICCAI_BraTS2021_TrainingData/11_3d"
         run_parallel(process_data, sorted(glob(os.path.join(path, "BraTS*"))))
-
 
 def delete_images(path):
     list = sorted(glob(os.path.join(path, "BraTS*")))
@@ -215,12 +191,10 @@ def delete_images(path):
         else:
             continue
 
-
 def change_config_file():
     data = pickle.load(open("/work/scratch/ecke/Groundtruth_Data/train/config.pkl", "rb"))
     data["in_channels"] = 3
     pickle.dump(data, open("/work/scratch/ecke/Groundtruth_Data/train/config.pkl", "wb"))
-
 
 def to_lbl(pred):
     enh = pred[2]
@@ -242,7 +216,6 @@ def to_lbl(pred):
     pred = np.transpose(pred, (2, 1, 0)).astype(np.uint8)
     return pred
 
-
 def prepare_preditions(e):
     fname = e[0].split("/")[-1].split(".")[0]
     preds = [np.load(f) for f in e]
@@ -256,7 +229,6 @@ def prepare_preditions(e):
         os.path.join("/work/scratch/ecke/Groundtruth_Data/results/final_preds", fname + ".nii.gz"),
     )
 
-
 def post_processing(complexity="simple"):
 
     PATH_Data = "/work/scratch/ecke/Groundtruth_Data/results"
@@ -265,36 +237,20 @@ def post_processing(complexity="simple"):
     # match this paths for simple version
     data_list = os.path.join(PATH_Data, "final_preds/vp*")
     data1 = os.path.join(PATH_Data, "final_preds")
-    # match also this paths for complex version
-    #data2 = os.path.join(PATH_Data, "final_preds_400epochs_303_new_vp3")
-    #data3 = os.path.join(PATH_Data, "final_preds_400epochs_317_new_vp3")
 
     list = sorted(glob(data_list))
 
     for image in list:
-        example_id = image.split("/")[-1]  # vp1.nii.gz
-        name = image.split("/")[-1].split(".")[0]  # vp1
-
+        example_id = image.split("/")[-1]
+        name = image.split("/")[-1].split(".")[0]
         # To get affine matrix and header of masks
         img1 = nib.load(os.path.join(data1, example_id))
         # Data
         np_img1 = img1.get_fdata().astype(np.int16)
-        #np_img2 = nib.load(os.path.join(data2, example_id)).get_fdata().astype(np.int16)
-        #np_img3 = nib.load(os.path.join(data3, example_id)).get_fdata().astype(np.int16)
-
-        if complexity == "simple":
-            np_img1 = np_img1
-        else:
-            ...
-            # Use the best segmentation map (dice score) and mark only voxels where two out of three runs detect a tumour.
-            #np_img1 = np.where((np_img2 == 0) & (np_img3 == 0), 0, np_img1)
-
         nib.save(nib.Nifti1Image(np_img1.astype(np.uint8), img1.affine, header=img1.header),
                  os.path.join(PATH_Server, name, "automated_mask.nii.gz"))
 
-
 def error_processing(image="vp3"):
-
     meta_path = os.path.join("/work/scratch/ecke/Groundtruth_Data/results/final_preds", image + ".nii.gz")
     mask_path = os.path.join("/images/Diffusion_Imaging/uka_gliom/raw", image, "tumorsegment.nii.gz")
     save_path = os.path.join("/work/scratch/ecke/Groundtruth_Data/results", image)
@@ -314,70 +270,41 @@ def error_processing(image="vp3"):
              os.path.join(save_path, "automated_mask.nii.gz"))
 
 
-"""
-------------------------------------------
-# PREPROCESSING
-------------------------------------------
-# Prepare data for dataloader
-# IMPORTANT: In folder-structure should only be the relevant nifti images (for example the T1 and FLAIR) -> Compare to BraTS-structure
-
-# Set global variable to True, if uka data should be prepared (otherwise nvidia data will be prepared)
-# uka_data = True
-prepare_data() 
-
-
-# Call further pre-pocessing from inside NVIDIA
-# IMPORTANT: Set datapath in nnUnet/preprocess.py
-
+# PREPROCESSING (Prepare data for dataloader)
+uka_data = True
+prepare_data()
+uka_data = False
+prepare_data()
 os.system("python /work/scratch/ecke/nnUNet/preprocess.py --task 11 --ohe --exec_mode training")
 os.system("python /work/scratch/ecke/nnUNet/preprocess.py --task 12 --ohe --exec_mode test")
 print("Finished!")
 
+# Change axis-order to BraTS format + save in right folder
+list = glob(opj("/work/scratch/ecke/ma_ecke/12_3d/test", "*"))
+for image in list:
+    if image[-5] == "a":
+        test_meta = np.load(image)
+        test_meta[0][[0, 1, 2]] = test_meta[0][[1, 2, 0]]
+        test_meta[1][[0, 1, 2]] = test_meta[1][[1, 2, 0]]
+        test_meta[2][[0, 1, 2]] = test_meta[2][[1, 2, 0]]
+        test_meta[3][[0, 1, 2]] = test_meta[3][[1, 2, 0]]
+        np.save("/work/scratch/ecke/Groundtruth_Data/test/" + image, test_meta)
+    else:
+        test = np.load(image)
+        test = np.swapaxes(test, 1, 3)
+        test = np.swapaxes(test, 1, 2)
+        np.save("/work/scratch/ecke/Groundtruth_Data/test/" + image, test)
 
-# Change axis-order to BraTS format + save in right folder (Do in loop for more than one image)
+# TRAINING (Call the training and Inference from NVIDIA)
+# (Correct data is saved in specified folders)
+# Important: Use GRAM of >= 16GB
 
-test = np.load("/work/scratch/ecke/ma_ecke/12_3d/test/XXX_x.npy")
-test_meta = np.load("/work/scratch/ecke/ma_ecke_vp3/12_3d/test/XXX_meta.npy")
-
-test = np.swapaxes(test, 1, 3)
-test = np.swapaxes(test, 1, 2)
-
-test_meta[0][[0, 1, 2]] = test_meta[0][[1, 2, 0]]
-test_meta[1][[0, 1, 2]] = test_meta[1][[1, 2, 0]]
-test_meta[2][[0, 1, 2]] = test_meta[2][[1, 2, 0]]
-test_meta[3][[0, 1, 2]] = test_meta[3][[1, 2, 0]] 
-
-np.save("/work/scratch/ecke/Groundtruth_Data/test/XXX_x.npy", test)
-np.save("/work/scratch/ecke/Groundtruth_Data/test/XXX_meta.npy", test_meta)
-"""
-
-
-
-
-"""
-------------------------------------------
-# TRAINING
-------------------------------------------
-# Call the training and Inference from NVIDIA (start here for new training and/or new testing)
-(Correct data is saved in specified folders)
-
-Important:
-- Use GRAM of >= 16GB (e.g. server or PC38)
-------------------------------------------
 # Training
-main.py --brats --deep_supervision --depth 6 --filters 64 96 128 192 256 384 512 --min_fmap 2 --scheduler --learning_rate 0.0003 --epochs XXX --fold 0 --amp --gpus 1 --task 11 --save_ckpt
+os.system("python /work/scratch/ecke/nnUNet/main.py --brats --deep_supervision --depth 6 --filters 64 96 128 192 256 384 512 --min_fmap 2 --scheduler --learning_rate 0.0003 --epochs 200 --fold 0 --amp --gpus 1 --task 11 --save_ckpt")
+# Testing
+os.system("python /work/scratch/ecke/nnUNet/main.py --gpus 1 --amp --save_preds --exec_mode predict --brats --data /work/scratch/ecke/Groundtruth_Data/test --ckpt_path /work/scratch/ecke/Groundtruth_Data/results/checkpoints/XXXXXXXXX.ckpt --tta")
 
-# Testing (nnUnet.py)
-main.py --gpus 1 --amp --save_preds --exec_mode predict --brats --data /work/scratch/ecke/Groundtruth_Data/test --ckpt_path /work/scratch/ecke/Groundtruth_Data/results/checkpoints/XXXXXXXXX.ckpt --tta
-"""
-
-
-
-
-"""
-------------------------------------------
-# POSTPROCESSING NVIDIA
-------------------------------------------
+# POSTPROCESSING
 os.makedirs("/work/scratch/ecke/Groundtruth_Data/results/final_preds")
 preds = sorted(glob(f"/work/scratch/ecke/Groundtruth_Data/results/predictions_epochXXX"))
 examples = list(zip(*[sorted(glob(f"{p}/*.npy")) for p in preds]))
@@ -385,31 +312,7 @@ print("Preparing final predictions")
 for e in examples:
     prepare_preditions(e)
 print("Finished!")
-"""
-
-
-
-
-"""
-------------------------------------------
-# VISUALIZATION
-------------------------------------------
-from Data.Processing.data_visualization import mask_control
-mask_control()
-"""
-
-
-
-
-"""
-------------------------------------------
-# POSTPROCESSING dMRI
-------------------------------------------
-# Postprocessing for diffusion MRI
-(Use the best segmentation map (dice score) and mark only voxels where two out of three runs detect a tumour.)
-(Simple will result in smoother masks)
-------------------------------------------
+# Use best segmentation mask for ground truth
 post_processing("simple")
-# Use this function to save a mask from uka as a NVIDIA-style mask (paths from raw uka data and NVIDIA masks)
-error_processing("vp27")
-"""
+# Use a UKA mask for subject 18
+error_processing("vp18")

@@ -1,7 +1,5 @@
-# Call training and testing. In both cases use /Results for the results.
 import torch
 import pytorch_lightning as pl
-from pytorch_lightning import seed_everything
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from LearningModule import LearningModule
@@ -13,15 +11,12 @@ import shutil
  
 
 def main():
-
     # Reset
     torch.cuda.empty_cache()
-    #seed_everything(42)
     print(config.args)
 
-    # Test
+    # Test mode
     if config.mode == "test":
-
         if os.path.exists(config.data_drop_off): 
             shutil.rmtree(config.data_drop_off)
         os.makedirs(config.data_drop_off)
@@ -32,7 +27,6 @@ def main():
         trainer = pl.Trainer(gpus=1)
         trainer.test(model, test_dataloaders=dataloader.test_dataloader())
         postprocessing.processing()
-
         shutil.rmtree(config.data_drop_off)
         quit()
 
@@ -75,9 +69,7 @@ def main():
     trainer = pl.Trainer(gpus=1)
     trainer.test(model, test_dataloaders=dataloader.test_dataloader())
     postprocessing.processing()
-
     shutil.rmtree(config.data_drop_off)
-
 
 if __name__ == "__main__":
     main()

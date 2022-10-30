@@ -1,5 +1,4 @@
 import random
-import matplotlib.pyplot as plt
 from config import anomaly_setting, anomaly_distribution
 import raster_geometry as rg
 import numpy as np
@@ -28,7 +27,6 @@ def anomaly_generation(input_data, mask):
 
         # Size and shape of anomaly
         random_size = random.randint(5, 11)
-        #anomaly_block = rg.sphere(2 * random_size, random_size).astype(int)
         anomaly_block = rg.ellipsoid(2 * random_size, (random_size * random.uniform(0.5, 1), random_size * random.uniform(0.5, 1), random_size * random.uniform(0.5, 1)))
         channels = [anomaly_block for _ in range(64)]
         anomaly_block = np.stack(channels, axis=0)
@@ -44,22 +42,22 @@ def anomaly_generation(input_data, mask):
         if anomaly_setting == "Iso":
             # Isotropic
             anomaly_block = np.multiply(anomaly_block, random.uniform(min, max))
-        elif anomaly_setting == "Normal1":
+        elif anomaly_setting == "Uniform1":
             # Random noise with centre value between 0.1 and 0.3
             noise = np.random.uniform(min, max, size=anomaly_block.shape)
             anomaly_block = np.multiply(anomaly_block, noise)
-        elif anomaly_setting == "Gauss1":
+        elif anomaly_setting == "Normal1":
             # Random noise with centre value between 0.1 and 0.3
             gaussian_noise = np.random.normal(mean, sd, size=anomaly_block.shape)
             anomaly_block = np.multiply(anomaly_block, gaussian_noise)
-        elif anomaly_setting == "Normal2":
+        elif anomaly_setting == "Uniform2":
             # Random vector in channel dimension asigned to each voxel of tumor (Equal for all voxel per channel)
             random_vector = np.random.uniform(min, max, size=64)
             for i in range(3):
                 channels = [random_vector for _ in range(2*random_size)]
                 random_vector = np.stack(channels, axis=1)
             anomaly_block = np.multiply(anomaly_block, random_vector)
-        elif anomaly_setting == "Gauss2":
+        elif anomaly_setting == "Normal2":
             # Random vector in channel dimension asigned to each voxel of tumor (Equal for all voxel per channel)
             random_vector = np.random.normal(mean, sd, size=64)
             for i in range(3):
@@ -118,7 +116,5 @@ def anomaly_generation(input_data, mask):
     # Reconstruction map
     reconstructive_map = np.where(block[0, :, :, :] != 0, 1, 0)
     reconstructive_map = reconstructive_map[None, :, :, :]
-    #reconstructive_map_background = torch.where(block[:, 0, :, :, :] == 0, 1, 0)
-    #reconstructive_map = torch.cat((reconstructive_map_tumor[:, None, :, :, :], reconstructive_map_background[:, None, :, :, :]), dim=1)
 
     return input_anomaly, np.float32(reconstructive_map), z_print

@@ -11,20 +11,22 @@ from scipy.ndimage.morphology import binary_opening
 from skimage import filters
 import skimage.measure
 
-
-"""
-
-QUANTITATIVE RESULTS
-
-"""
+#####################################
+#
+#
+# Plot quantitative results for the final output data of the models
+#
+#
+#####################################
 
 DATA_PATH = '/work/scratch/ecke/Masterarbeit/Data/Test'
 only_averaged = True
 pictures = True
 all_results = []
 
-loop = ["MeanPool"] #  ["MeanPool", "Unsupervised", "OptimalAUC", "OptimalF1", "Otsu"]
-choose_network = "RecDiscNet" #Results_DAE RecDiscNet
+# Decide threshold type and the network
+loop = ["MeanPool"]             # ["MeanPool", "Unsupervised", "OptimalAUC", "OptimalF1", "Otsu"]
+choose_network = "RecDiscNet"   #Results_DAE RecDiscNet
 
 def calculate_metrics(threshold, mask, map, opening, network, para1):
     map = np.where(map >= threshold, 1, 0)
@@ -50,7 +52,7 @@ def roc(map, brainmask_NoCSF, tumormask, choose_threshold, network, para1):
     if network == "UNet" and para1 == "None":
         tumormask = np.where(tumormask == 0, 1, 0)
 
-    # Thresholds!
+    # Thresholds
     if choose_threshold == "Unsupervised":
         if choose_network == "RecDiscNet":
             unsupervised_threshold = 0.5
@@ -85,7 +87,7 @@ def roc(map, brainmask_NoCSF, tumormask, choose_threshold, network, para1):
     else:
         raise NameError('This threshold type is not supported.')
 
-    # Choose only brain matter
+    # Opening
     if network == "UNet" and para1 == "None":
         map_opening = binary_opening(np.where(map >= unsupervised_threshold, 0, 1), structure=np.ones((3, 3, 3)))
     else:
@@ -110,10 +112,9 @@ def roc(map, brainmask_NoCSF, tumormask, choose_threshold, network, para1):
     idx = np.round(np.linspace(0, len(fpr) - 1, 40)).astype(int)
     fpr = fpr[idx]
     tpr = tpr[idx]
-
     return f1, auc, fpr, tpr, acc, optimal_threshold, f1_opening, acc_opening
 
-
+# ROC Curve
 def print_curve(list, analysis_results):
     color = ['navy', 'royalblue']
     if choose_network == "Results_DAE":
@@ -131,9 +132,7 @@ def print_curve(list, analysis_results):
     plt.savefig(opj(analysis_results, 'curve.pdf'), bbox_inches='tight', transparent = True)
     plt.show()
 
-
 def average_results(list1, list2, list3, list4, list5, list6, list7, number):
-
     for i in range(len(list1)):
         list1[i][0] = (list1[i][0] + list2[i][0] + list3[i][0] + list4[i][0] + list5[i][0] + list6[i][0] + list7[i][0]) / number
         list1[i][1] = (list1[i][1] + list2[i][1] + list3[i][1] + list4[i][1] + list5[i][1] + list6[i][1] + list7[i][1]) / number
@@ -171,7 +170,6 @@ def quantitative_analysis(result_list, choose_threshold):
         tumor_list.sort()
         network = item.split("/")[-1].split("-")[0]
         f1_list, auc_list, fpr_list, tpr_list, acc_list, threshold_list, f1_opening_list, acc_opening_list, histo_list = [], [], [], [], [], [], [], [], []
-        # Naming -> depends on Network and paramter
         if network == "VanillaVAE":
             para1 = item[item.find('ldim=') + len('ldim='):item.rfind('-ar')]
             para2 = item[item.find('ar=') + len('ar='):item.rfind('.ckpt')]
@@ -184,7 +182,7 @@ def quantitative_analysis(result_list, choose_threshold):
             if para2.endswith('-v1'):
                 para2 = para2[:-3]
             para3 = network
-        # RedDisc and RedDiscUnet
+        # RedDiscNet
         else:
             para1 = item[item.find('an=') + len('an='):item.rfind('-d')]
             para2 = item[item.find('d=') + len('d='):item.rfind('.ckpt')]
@@ -230,28 +228,7 @@ def quantitative_analysis(result_list, choose_threshold):
         list.append([f1_average, auc_average, fpr_average, tpr_average, para1, para2, st_dev,
                      para3+'_'+para1+'_'+para2, acc_average, threshold_average, acc_opening_average,
                      f1_opening_average, st_dev_f1, st_dev_f1opening])
-
     return list
-
-def test_run(choose_threshold):
-    if choose_network == "RecDiscNet":
-        analysis_results = "/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies"
-        result_list = glob(opj("/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/Run 750e+64f (inc. some Rec)", "*"))
-        list_run1 = quantitative_analysis(result_list, choose_threshold)
-        list_run1 = sorted(list_run1, key=itemgetter(7))
-        df_1 = pd.DataFrame(list_run1)
-        #df_1.to_csv(opj(analysis_results, 'raw_data_9.csv'), index=False, header=False)
-
-        # average
-        average_list = average_results(list_run1, list_run1, list_run1, list_run1, list_run1, list_run1, list_run1,
-                                       number=7)
-        # sorted from worst to best
-        list = sorted(average_list, key=itemgetter(1))
-        #print_curve(list[0:1] + list[-1:], analysis_results)
-        # Save to excel
-        df = pd.DataFrame(list)
-        df.to_csv(opj(analysis_results, 'quantitative_analysis_averaged.csv'), index=False, header=False)
-    return
 
 def call_analysis(choose_threshold):
     if choose_network == "Results_DAE":
@@ -304,8 +281,6 @@ def call_analysis(choose_threshold):
         if only_averaged != True:
             df_7 = pd.DataFrame(list_run7)
             df_7.to_csv(opj(analysis_results, 'raw_data7.csv'), index=False, header=False)
-
-        # ---------------------------------------------------------------------------------------------------------- #
 
         # average
         average_list = average_results(list_run1, list_run2, list_run3, list_run4, list_run5, list_run6, list_run7, number = 7)
@@ -372,8 +347,6 @@ def call_analysis(choose_threshold):
             df_7 = pd.DataFrame(list_run7)
             df_7.to_csv(opj(analysis_results, 'raw_data7.csv'), index=False, header=False)
 
-        # ---------------------------------------------------------------------------------------------------------- #
-
         # average
         average_list = average_results(list_run1, list_run2, list_run3, list_run4, list_run5, list_run6, list_run7,
                                        number=7)
@@ -408,5 +381,3 @@ def all_results_to_excel():
 
 threshold_loop(loop)
 all_results_to_excel()
-
-

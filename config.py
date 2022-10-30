@@ -1,4 +1,3 @@
-# Define my configs.
 from glob import glob
 from os.path import join as opj
 import random
@@ -11,18 +10,17 @@ parser = ArgumentParser()
 parser.add_argument("-m", "--mode", default="train", help="Training mode of network (train or test)")
 parser.add_argument("-t", "--test_this_model", default="RecDisc-epoch=107-val_loss=0.11-r=4-an=Mix-d=Half.ckpt", help="Name of model to be tested. Only usefull if mode is -test-.")
 parser.add_argument("-e", "--epochs", default=250, type=int, help="Number of epochs to train the model.")
-parser.add_argument("-n", "--network", default="RecDisc", help="Name of Network: VanillaVAE, SpatialVAE, VoxelVAE or UNet.")
-parser.add_argument("-l", "--latent_dim", default=2, type=int, help="Dimension of latent space, currently only available for VanillaVAE and VoxelVAE")
-parser.add_argument("-r", "--run", default=8, type=int, help="New parameter to train network with same parameter at the same time")
-parser.add_argument("-f", "--filter", default=128, type=int, help="Number of filters used in UNet for reconstruction.")
-parser.add_argument("-a", "--activation", default="None", help="Activationfunction of discriminiation network in RecDisc(Unet): None or Sigmoid")
-parser.add_argument("-ar", "--activation_rec", default="None", help="Activationfunction of reconstruction network in RecDisc(Unet): None or Sigmoid")
-parser.add_argument("-lr", "--learningrate", default=0.001, type=float, help="Number of filters used in UNet for reconstruction.")
-parser.add_argument("-pw", "--positivweight", default=20, type=int, help="Number of filters used in UNet for reconstruction.")
-parser.add_argument("-lw", "--lossweight", default=5, type=int, help="Number of filters used in UNet for reconstruction.")
+parser.add_argument("-n", "--network", default="RecDisc", help="Name of Network: VanillaVAE, UNet or RecDisc")
+parser.add_argument("-l", "--latent_dim", default=2, type=int, help="Dimension of latent space, only relevant for VanillaVAE")
+parser.add_argument("-r", "--run", default=8, type=int, help="Define the k-fold cross validation number (1-7). Use 8 for shuffle.")
+parser.add_argument("-f", "--filter", default=128, type=int, help="Number of filters used in UNet or the RecDiscNet for reconstruction.")
+parser.add_argument("-a", "--activation", default="Linear", help="Activation function of discriminiation network in RecDiscNet: Linear or Sigmoid")
+parser.add_argument("-ar", "--activation_rec", default="Linear", help="Activationfunction of reconstruction network in RecDiscNet or other networks: Linear or Sigmoid")
+parser.add_argument("-lr", "--learningrate", default=0.001, type=float, help="Learning rate")
+parser.add_argument("-pw", "--positivweight", default=20, type=int, help="Positive weight for RecDiscNet loss. pw > 1 emphasized class 1.")
+parser.add_argument("-lw", "--lossweight", default=5, type=int, help="Loss weight for RecDiscNet loss. lw > 1 emphasized discrimination.")
 parser.add_argument("-leaky", "--leaky_relu", default="False", help="Use of leakyrelu. Otherwise a normal ReLu Unit is used.")
-
-parser.add_argument("-an", "--anomaly", default="Mix", help="Choose anomaly: Iso, Normal1, Gauss1, Normal2, Gauss2, Mix.")
+parser.add_argument("-an", "--anomaly", default="Mix", help="Choose anomaly: Iso, Normal1, Uniform1, Normal2, Uniform2, Mix. Whereby 1 is random and 2 directionally.")
 parser.add_argument("-d", "--distribution", default="Full", help="Center of anomaly distribution is half the center of brain matter distribution if not set to Full.")
 
 args = vars(parser.parse_args())
@@ -41,39 +39,18 @@ learning_rate = args["learningrate"]
 positiv_weight = args["positivweight"]
 loss_weight = args["lossweight"]
 leaky_relu = args["leaky_relu"]
-# For full images, we have only 28. 4 is a power of 2 and a divider of 28.
-if (network == "VoxelVAE"):
-  batch_size = int(80*64*64*0.2)
-elif (network == "CNNVoxelVAE"):
-  batch_size = (64 * 64)
-elif (network == "UNet") and run == 15:
+
+# Batch size
+if (network == "UNet") and run == 15: # for testing on smaller GPUs
   batch_size = 2
 else:
   batch_size = 4
 
-# VanillaVAE params
+# Params
 vanilla_params = {"LR": learning_rate,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95,
   "kld_weight": 0.0000122}      # (input.shape.flatten / latent space dimensions)^-1}
-
-spatialvae_params = {"LR": learning_rate,
-  "weight_decay": 0.0,
-  "scheduler_gamma": 0.95,
-  "kld_weight": 0.002      # (input.shape.flatten / latent space dimensions)^-1
-  }
-
-voxelvae_params = {"LR": learning_rate,
-  "weight_decay": 0.0,
-  "scheduler_gamma": 0.95,
-  "kld_weight": 1      # (input.shape.flatten / latent space dimensions)^-1
-  }
-
-cnnvoxelvae_params = {"LR": learning_rate,
-  "weight_decay": 0.0,
-  "scheduler_gamma": 0.95,
-  "kld_weight": 0.0025     # (input.shape.flatten / latent space dimensions)^-1
-  }
 
 unet_params = {"LR": learning_rate,
   "weight_decay": 0.0,
@@ -84,7 +61,7 @@ rec_disc_params = {"LR": learning_rate,
   "weight_decay": 0.0,
   "scheduler_gamma": 0.95}
 
-# Load data. Training data is randomly shuffled.
+# Load data
 img_path_uka = '/work/scratch/ecke/Masterarbeit/Data'
 train = glob(opj(img_path_uka, "Train", "vp*"))
 train.sort()
@@ -95,6 +72,7 @@ test_mask.sort()
 test_b0_brainmask = glob(opj(img_path_uka, "Test", "b0_brainmask*"))
 test_b0_brainmask.sort()
 
+# k-fold cross validation
 split = 24 #used in dataset
 if run == 1:
   uka_subjects = {"training": train[0:24], "validation": train[24:28], "test": test[0:32],
@@ -130,6 +108,7 @@ save_path = opj("/work/scratch/ecke/Masterarbeit/logs/Callback", test_this_model
 results_path = opj("/work/scratch/ecke/Masterarbeit/Results", test_this_model)
 data_drop_off = opj("/work/scratch/ecke/Masterarbeit/logs/DataDropOff", test_this_model) 
 
+# File names of results
 anomaly_testing = True
 if (network == "RecDisc") or (network == "RecDiscUnet"):
   if anomaly_testing == True:
@@ -143,7 +122,7 @@ elif (network == "UNet"):
 else:
   file_name = network + '-{epoch:02d}-{val_loss:.2f}' + '-r=' + str(run)
 
-
+# ID for direct testing after a run (train+test)
 def create_id(test_id):
   global test_this_model
   test_this_model = test_id

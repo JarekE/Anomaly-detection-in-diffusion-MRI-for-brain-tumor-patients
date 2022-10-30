@@ -1,9 +1,8 @@
-# Load my data into the pipeline
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
-
 from Dataset import UKADataset
 import config
+
 
 class DataModule(pl.LightningDataModule):
 

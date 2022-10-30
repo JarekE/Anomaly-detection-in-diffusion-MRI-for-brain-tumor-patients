@@ -96,7 +96,6 @@ class UNet3d(nn.Module):
 
 
     def forward(self, input_data):
-
         rec = self.reconstructive(input_data)
 
         return [rec]
@@ -104,11 +103,9 @@ class UNet3d(nn.Module):
     def loss_function(self,
                       *args,
                       **kwargs) -> dict:
-
         reconstruction = args[0]
         target = args[1]
 
         reconstruction_loss = F.mse_loss(reconstruction, target)
         loss = reconstruction_loss
-
         return {'loss': loss, 'RL': reconstruction_loss.detach()}
