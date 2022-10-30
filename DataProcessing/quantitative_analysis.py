@@ -23,12 +23,17 @@ only_averaged = True
 pictures = True
 all_results = []
 
-loop = ["Unsupervised"] #  ["MeanPool", "Unsupervised", "OptimalAUC", "OptimalF1", "Otsu"]
+loop = ["MeanPool"] #  ["MeanPool", "Unsupervised", "OptimalAUC", "OptimalF1", "Otsu"]
 choose_network = "RecDiscNet" #Results_DAE RecDiscNet
 
-def calculate_metrics(threshold, mask, map, opening):
-
+def calculate_metrics(threshold, mask, map, opening, network, para1):
     map = np.where(map >= threshold, 1, 0)
+
+   # Switch foreground and background class of mask und map for real Dice Score (opening map already done by calculating the opening)
+    if network == "UNet" and para1 == "None":
+        mask = np.where(mask == 0, 1, 0)
+        map = np.where(map == 0, 1, 0)
+
     f1 = f1_score(mask, map)
     f1_opening = f1_score(mask, opening)
     acc = accuracy_score(mask, map)
@@ -36,11 +41,14 @@ def calculate_metrics(threshold, mask, map, opening):
 
     return f1, acc, f1_opening, acc_opening
 
-def roc(map, brainmask_NoCSF, tumormask, choose_threshold):
+def roc(map, brainmask_NoCSF, tumormask, choose_threshold, network, para1):
     # Change tumor mask (target) to a binary mask
     tumormask[tumormask > 0] = 1
     map = np.where(brainmask_NoCSF == 1, map, 0)
     tumormask = np.where(brainmask_NoCSF == 1, tumormask, 0)
+
+    if network == "UNet" and para1 == "None":
+        tumormask = np.where(tumormask == 0, 1, 0)
 
     # Thresholds!
     if choose_threshold == "Unsupervised":
@@ -78,7 +86,10 @@ def roc(map, brainmask_NoCSF, tumormask, choose_threshold):
         raise NameError('This threshold type is not supported.')
 
     # Choose only brain matter
-    map_opening = binary_opening(np.where(map >= unsupervised_threshold, 1, 0), structure=np.ones((3, 3, 3)))
+    if network == "UNet" and para1 == "None":
+        map_opening = binary_opening(np.where(map >= unsupervised_threshold, 0, 1), structure=np.ones((3, 3, 3)))
+    else:
+        map_opening = binary_opening(np.where(map >= unsupervised_threshold, 1, 0), structure=np.ones((3, 3, 3)))
     map_flatten = map.flatten()
     tumormask_flatten = tumormask.flatten()
     map_opening_flatten = map_opening.flatten()
@@ -93,7 +104,7 @@ def roc(map, brainmask_NoCSF, tumormask, choose_threshold):
     fpr, tpr, threshold = roc_curve(tumormask_flatten, map_flatten)
 
     # Metrics
-    f1, acc, f1_opening, acc_opening = calculate_metrics(unsupervised_threshold, tumormask_flatten, map_flatten, map_opening_flatten)
+    f1, acc, f1_opening, acc_opening = calculate_metrics(unsupervised_threshold, tumormask_flatten, map_flatten, map_opening_flatten, network, para1)
 
     # Bring fpr and tpr to 40 evenly spaced values
     idx = np.round(np.linspace(0, len(fpr) - 1, 40)).astype(int)
@@ -103,17 +114,21 @@ def roc(map, brainmask_NoCSF, tumormask, choose_threshold):
     return f1, auc, fpr, tpr, acc, optimal_threshold, f1_opening, acc_opening
 
 
-def print_curve(list, analysis_results): 
-    #marker = ["v", "^", "<", ">", "8", "s", "p", "*", ".", "D"]
+def print_curve(list, analysis_results):
+    color = ['navy', 'royalblue']
+    if choose_network == "Results_DAE":
+        title = ["U-Net Linear with 64 Filters", "VanVAE Sigmoid with LSD 512"]
+    else:
+        title = ["Normal Directional Full Mean", "Mixed Half Mean"]
     for i in range(len(list)):
         print('Model' + str(list[i][7]) + ': ROC AUC=%.3f' % (list[i][1]))
-        plt.plot(list[i][2], list[i][3], marker=".",
-                    label='Model: ' + str(list[i][7]) + ' -  AUC: ' + str(np.around(list[i][1], 2)) + '\u00B1' + str(round(list[i][6], 2)))
+        plt.plot(list[i][2], list[i][3], color=color[i], marker=".",
+                    label=title[i]+' -  AUC: ' + str(np.around(list[i][1], 2)) + '\u00B1' + str(round(list[i][6], 2)))
 
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.legend()
-    plt.savefig(opj(analysis_results, 'curve.png'), bbox_inches='tight', transparent = True)
+    plt.savefig(opj(analysis_results, 'curve.pdf'), bbox_inches='tight', transparent = True)
     plt.show()
 
 
@@ -186,7 +201,7 @@ def quantitative_analysis(result_list, choose_threshold):
             histo_list.append(map)
             brainmask_NoCSF = np.load(brainmask_NoCSF_list[i])
             tumor = np.load(tumor_list[i])
-            f1, auc, fpr, tpr, acc, threshold, f1_opening, acc_opening = roc(map, brainmask_NoCSF, tumor, choose_threshold)
+            f1, auc, fpr, tpr, acc, threshold, f1_opening, acc_opening = roc(map, brainmask_NoCSF, tumor, choose_threshold, network, para1)
             f1_list.append(f1)
             threshold_list.append(threshold)
             acc_list.append(acc)

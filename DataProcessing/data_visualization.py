@@ -363,7 +363,7 @@ def z_space_analysis(z_space, classes):
     return
 
 
-def show_histogram():
+def data_histogram(mean_str, distr):
     DATA_PATH = '/work/scratch/ecke/Masterarbeit/Data/Train'
     data_list = glob(opj(DATA_PATH, "vp*"))
     data_list_mask = glob(opj(DATA_PATH, "brainmask_withoutCSF*"))
@@ -382,31 +382,34 @@ def show_histogram():
     histo_data = histo_data[histo_data > 0.0]
     mean = np.mean(histo_data)
     sd = np.std(histo_data)
-    mu = mean/2
+    if mean_str == "Half of Mean":
+        mu = mean/2
+    else:
+        mu = mean
     sigma = sd
 
     matplotlib.rcParams.update({'font.size': 25})
     plt.figure(figsize=(14, 7))  # Make it 14x7 inch
     plt.style.use('seaborn-whitegrid')  # nice and clean grid
     plt.hist(histo_data, bins=90, facecolor='#2ab0ff', edgecolor='#169acf', linewidth=0.5, density = True, zorder = 0, label = "Histogram")
-    plt.title('Half of Mean Normal Distribution', fontsize=50)
+    plt.title(mean_str+' '+distr+' Distribution', fontsize=50)
     plt.xlabel('Value', fontsize=30)
     plt.ylabel('Density', fontsize=30)
 
-    if 0:
+    if distr == "Uniform":
         # Gleichverteilung
-        x_normal = np.linspace(mean - sd, mean + sd, 100)
+        x_normal = np.linspace(mu - sd, mu + sd, 100)
         y_normal = np.full(100, 1 / (2*sd))
         plt.plot(x_normal, y_normal, color='navy', zorder=1, label = "Anomaly")
         plt.fill_between(x_normal, y_normal, alpha=0.5, color='navy', zorder=1)
-    if 1:
+    if distr == "Normal":
         # Gauß
         x = np.linspace(0, mu + 3 * sigma, 100)
         plt.plot(x, stats.norm.pdf(x, mu, sigma), color='navy', label = "Anomaly")
         plt.fill_between(x, stats.norm.pdf(x, mu, sigma), alpha=0.5, color='navy')
 
     plt.legend(fontsize=30, loc = "upper right")
-    plt.savefig("half_mean_normal.png")
+    plt.savefig(mean_str+distr+'.pdf')
     plt.show()
 
     print("Mean: ", mean)
@@ -418,25 +421,45 @@ def show_histogram():
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
-def output_histogram(network, activation, name):
+def output_histogram(model = "DAE", network = "UNet", id = "ar=None-f=64.ckpt", title = "U-Net Linear"):
     DATA_PATH = '/work/scratch/ecke/Masterarbeit/Data/Test'
-    root = '/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/'
-    subdirs = ['Run4', 'Run3', 'Run2', 'Run1', 'Run7', 'Run5', 'Run6 (inc. Rec)']
-    list = []
-    data_list = []
 
-    for dir in subdirs:
-        run = sorted(glob(opj(root, dir, '*'+network, "map*")))
-        list.append(run)
+    if model == "DAE":
+        root = '/work/scratch/ecke/Masterarbeit/Results_DAE/Results/'
+        subdirs = ['Run4', 'Run3', 'Run2', 'Run1', 'Run7', 'Run5', 'Run6']
+        list = []
+        data_list = []
 
-    for i in range(len(list[0])):
-        data = np.zeros((64,80,64))
-        for j in range(len(list)):
-            map = np.load(list[j][i])
-            map = sigmoid(map)
-            data = data + map
-        data = data / len(list)
-        data_list.append(data)
+        for dir in subdirs:
+            run = sorted(glob(opj(root, dir, network + '*' + id, "map*")))
+            list.append(run)
+
+        for i in range(len(list[0])):
+            data = np.zeros((64, 80, 64))
+            for j in range(len(list)):
+                map = np.load(list[j][i])
+                data = data + map
+            data = data / len(list)
+            data_list.append(data)
+
+    else:
+        root = '/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/Results_Anomalies/'
+        subdirs = ['Run4', 'Run3', 'Run2', 'Run1', 'Run7', 'Run5', 'Run6 (inc. Rec)']
+        list = []
+        data_list = []
+
+        for dir in subdirs:
+            run = sorted(glob(opj(root, dir, '*'+id, "map*")))
+            list.append(run)
+
+        for i in range(len(list[0])):
+            data = np.zeros((64,80,64))
+            for j in range(len(list)):
+                map = np.load(list[j][i])
+                map = sigmoid(map)
+                data = data + map
+            data = data / len(list)
+            data_list.append(data)
 
     data_list_brainmask = sorted(glob(opj(DATA_PATH, "brainmask_withoutCSF*")))
     data_list_mask = sorted(glob(opj(DATA_PATH, "mask*")))
@@ -470,62 +493,16 @@ def output_histogram(network, activation, name):
              label="Brain Matter", range=(0,1))
     plt.hist(histo_anomaly, bins=90, color='navy', linewidth=0.5, density=True, zorder=1, alpha = 0.5,
              label="Anomaly", range=(0,1))
-    plt.title(name+' '+activation+' Mean Distribution', fontsize=50)
-    plt.xlabel('Residual', fontsize=30)
+    plt.title(title, fontsize=50)
+    if model == "DAE":
+        plt.xlabel('Residual', fontsize=30)
+    else:
+        plt.xlabel('Value', fontsize=30)
     plt.ylabel('Density', fontsize=30)
 
     plt.legend(fontsize=30, loc="upper right")
-    plt.savefig("residual_histogram_"+name+activation+".png")
+    plt.savefig(title+'.pdf')
     plt.show()
     return
 
-
-#output_histogram(network = 'an=Normal1-d=Half.ckpt', activation="Half", name="Uniform Random")
-
-
-
-
-
-
-
-
-
-#show_histogram()
-#final_data_test()
-#final_data_train()
-#tumor_diffspace_control()
-
-"""
-fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
-
-test_image = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/vp10.npy")
-test_mask = np.load("/work/scratch/ecke/Masterarbeit/Data/Test/brainmask_withoutCSFvp10.npy")
-
-test_image = np.flip(np.flip(np.swapaxes(test_image, 1, 3), axis=1), axis=2)
-test_mask = np.flip(np.flip(np.swapaxes(test_mask, 0, 2), axis=0), axis=1)
-
-b = 35
-ax[0].imshow(test_image[40, b, :, :], cmap='gray')
-ax[0].axis('off')
-ax[1].imshow(test_mask[b, :, :], cmap='gray')
-ax[1].axis('off')
-plt.tight_layout()
-plt.show()
-#fig.savefig('test.png', dpi=fig.dpi)
-plt.close(fig)
-
-
-
-plt.imshow(patch[40, :, :, z], cmap='gray')
-                            plt.axis('off')
-                            plt.show()
-                            plt.close()
-                            plt.imshow(anomaly_x[40, :, :, z], cmap='gray')
-                            plt.axis('off')
-                            plt.show()
-                            plt.close()
-                            plt.imshow(reconstructive_map[0, :, :, z], cmap='gray')
-                            plt.axis('off')
-                            plt.show()
-                            plt.close()
-"""
+output_histogram(model="RecDisc", network="RecDisc", id="an=Gauss2-d=Full.ckpt", title="Normal Directional Full Mean Distribution")

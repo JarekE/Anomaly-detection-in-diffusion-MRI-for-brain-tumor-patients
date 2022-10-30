@@ -136,26 +136,26 @@ def logs_for_training(mode = "RecDisc"):
 
         mean_loss_2 = loss / len(load_list)
         plt.rcParams["figure.figsize"] = (10, 4)
-        plt.plot(epochs_number, mean_loss, 'b', label='VanVAE Loss')
-        plt.plot(epochs_number, mean_loss_2, 'r', label='U-Net Loss')
+        plt.plot(epochs_number, mean_loss, 'navy', label='VanVAE Loss')
+        plt.plot(epochs_number, mean_loss_2, 'royalblue', label='U-Net Loss')
         plt.title('Mean Validation Loss')
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
-        plt.savefig('DAE_loss.png')
+        plt.savefig('DAE_loss.pdf')
         plt.show()
 
         mean_loss = mean_loss[0:50]
         mean_loss_2 = mean_loss_2[0:50]
         epochs_number = range(1, 51)
         plt.rcParams["figure.figsize"] = (10, 4)
-        plt.plot(epochs_number, mean_loss, 'b', label='VanVAE Loss')
-        plt.plot(epochs_number, mean_loss_2, 'r', label='U-Net Loss')
+        plt.plot(epochs_number, mean_loss, 'navy', label='VanVAE Loss')
+        plt.plot(epochs_number, mean_loss_2, 'royalblue', label='U-Net Loss')
         plt.title('Mean Validation Loss')
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
-        plt.savefig('DAE_loss_zoomed.png')
+        plt.savefig('DAE_loss_zoomed.pdf')
         plt.show()
     else:
         load_logs = "/work/scratch/ecke/Masterarbeit/Results_RecDiscNet/LogsForTraining"
@@ -200,7 +200,7 @@ def logs_for_training(mode = "RecDisc"):
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
-        plt.savefig('RecDiscNet_loss.png')
+        plt.savefig('RecDiscNet_loss.pdf')
         plt.show()
 
         mean_loss = mean_loss[0:50]
@@ -216,9 +216,9 @@ def logs_for_training(mode = "RecDisc"):
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
-        plt.savefig('RecDiscNet_loss_zoomed.png')
+        plt.savefig('RecDiscNet_loss_zoomed.pdf')
         plt.show()
 
     return
 
-#logs_for_training()
+logs_for_training()
