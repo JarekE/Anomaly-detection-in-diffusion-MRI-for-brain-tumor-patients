@@ -18,17 +18,17 @@ For further information about the topic please feel free to write me an email: j
 ## Instruction
 
 DataProcessing
-- groundtruth.py
+- groundtruth.py \
 In order to evaluate the anomaly detection, a ground truth must be created. Using the script, a U-Net is 
 trained on the BraTS 2021 data and then tested on the subjects from UKA. The script guides through the entire process 
 to the final masks on the MRI data for this project. Registration to dMRI takes place externally. Access to the 
 UKA data and the BraTS 2021 data is a prerequisite.
 
-- processing_data.py
+- processing_data.py \
 Herewith the UKA data can be preprocessed for this project. Furthermore, all folder structures are created correctly. 
 Access to all dMRI datasets and the corresponding masks for the tumors are required.
 
-- qualitative_analysis.py and quantitative_analysis.py
+- qualitative_analysis.py and quantitative_analysis.py \
 These scripts access the results of the trained networks and can be used to evaluate them.
 
 main.py
