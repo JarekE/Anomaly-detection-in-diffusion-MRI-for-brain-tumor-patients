@@ -41,10 +41,11 @@ Models
 ## Data
  
 - UKA dataset (in-house)
-    - 28 diffusion MRI images with 64 channels for training
-    - 32 diffusion MRI images with 64 channels for testing
+    - 28 diffusion MRI images with 64 channels for training (healty test group)
+    - 32 diffusion MRI images with 64 channels for testing (patients), including the corresponding T1 and FLAIR volumes 
+    for the ground truth
 - BraTS 2021 data (public)
-    - 1251 training datasets from BraTS 2021 with T1, T1ce, T2 and FLAIR volumes
+    - 1251 training datasets from BraTS 2021 with T1, T1ce, T2 and FLAIR volumes for ground truth training
 
 ## Requirements
 
